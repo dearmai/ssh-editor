@@ -60,6 +60,102 @@ async fn try_publickey_auth(
     Ok(matches!(result, AuthResult::Success))
 }
 
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PingInfo {
+    /// 서버 UTC epoch (초)
+    pub epoch: i64,
+    /// 서버 타임존 오프셋 (분)
+    pub tz_offset_minutes: i32,
+    /// 왕복 지연 (ms)
+    pub ping_ms: u64,
+}
+
+/// SSH exec로 `date`를 실행해 서버 시각과 왕복 지연(ping)을 측정한다.
+pub async fn ping_server(session: &SshSession) -> AppResult<PingInfo> {
+    use russh::ChannelMsg;
+
+    let start = std::time::Instant::now();
+    let handle = session.handle.lock().await;
+    let mut channel = handle.channel_open_session().await?;
+    channel.exec(true, "date '+%s|%z'").await?;
+
+    let mut out: Vec<u8> = Vec::new();
+    loop {
+        match channel.wait().await {
+            Some(ChannelMsg::Data { data }) => out.extend_from_slice(&data),
+            Some(ChannelMsg::Eof) | Some(ChannelMsg::Close) | None => break,
+            _ => {}
+        }
+    }
+    let ping_ms = start.elapsed().as_millis() as u64;
+
+    let text = String::from_utf8_lossy(&out);
+    let line = text.trim();
+    let mut parts = line.split('|');
+    let epoch = parts
+        .next()
+        .and_then(|s| s.trim().parse::<i64>().ok())
+        .ok_or_else(|| AppError::Other(format!("date 출력 파싱 실패: {:?}", line)))?;
+    let tz = parts.next().unwrap_or("+0000").trim();
+    let tz_offset_minutes = parse_tz_offset(tz);
+
+    Ok(PingInfo {
+        epoch,
+        tz_offset_minutes,
+        ping_ms,
+    })
+}
+
+/// 원격에서 명령을 실행하고 stdout(문자열)과 종료 코드를 반환
+pub async fn run_command(session: &SshSession, cmd: &str) -> AppResult<(Vec<u8>, i32)> {
+    use russh::ChannelMsg;
+
+    let handle = session.handle.lock().await;
+    let mut channel = handle.channel_open_session().await?;
+    channel.exec(true, cmd).await?;
+
+    let mut out: Vec<u8> = Vec::new();
+    let mut code: i32 = 0;
+    loop {
+        match channel.wait().await {
+            Some(ChannelMsg::Data { data }) => out.extend_from_slice(&data),
+            Some(ChannelMsg::ExitStatus { exit_status }) => code = exit_status as i32,
+            Some(ChannelMsg::Eof) | Some(ChannelMsg::Close) | None => break,
+            _ => {}
+        }
+    }
+    Ok((out, code))
+}
+
+/// 셸 인용 (작은따옴표로 감싸고 내부 ' 는 '\'' 로 이스케이프)
+pub fn shell_quote(s: &str) -> String {
+    let mut q = String::with_capacity(s.len() + 2);
+    q.push('\'');
+    for ch in s.chars() {
+        if ch == '\'' {
+            q.push_str("'\\''");
+        } else {
+            q.push(ch);
+        }
+    }
+    q.push('\'');
+    q
+}
+
+/// "+0900" / "-0530" 형식의 타임존 오프셋을 분 단위로 변환
+fn parse_tz_offset(tz: &str) -> i32 {
+    let sign = if tz.starts_with('-') { -1 } else { 1 };
+    let digits: String = tz.chars().filter(|c| c.is_ascii_digit()).collect();
+    if digits.len() >= 4 {
+        let h: i32 = digits[0..2].parse().unwrap_or(0);
+        let m: i32 = digits[2..4].parse().unwrap_or(0);
+        sign * (h * 60 + m)
+    } else {
+        0
+    }
+}
+
 pub async fn ssh_connect_inner(profile: ConnectionProfile) -> AppResult<Arc<SshSession>> {
     tokio::time::timeout(
         std::time::Duration::from_secs(30),

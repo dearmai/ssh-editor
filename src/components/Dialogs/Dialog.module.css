@@ -14,11 +14,17 @@
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: 6px;
-  width: 440px;
+  width: 460px;
   max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
   z-index: 201;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   animation: slideIn 0.15s ease;
+}
+.content .form {
+  overflow-y: auto;
 }
 
 @keyframes fadeIn {
@@ -211,4 +217,193 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* 설정 다이얼로그 */
+.sectionTitle {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.preview {
+  padding: 10px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.segGroup {
+  display: flex;
+  gap: 6px;
+}
+
+.segBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  justify-content: center;
+  padding: 8px 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
+}
+.segBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.segActive {
+  border-color: var(--accent);
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* 색상 테마 선택 */
+.themeGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+.themeChip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg-primary);
+  text-align: left;
+  transition: border-color 0.1s, background 0.1s;
+}
+.themeChip:hover {
+  background: var(--bg-hover);
+}
+.themeChipActive {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.swatches {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.swatch {
+  width: 9px;
+  height: 16px;
+  border-radius: 2px;
+}
+
+.themeName {
+  font-size: 12px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.iconRemoveBtn {
+  width: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.iconRemoveBtn:hover {
+  background: rgba(244, 135, 113, 0.15);
+  border-color: #f48771;
+  color: #f48771;
+}
+
+.addDirBtn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  padding: 4px 10px;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+}
+.addDirBtn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+/* 저장 충돌 다이얼로그 */
+.conflictMsg {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+.conflictMsg code,
+.conflictBtnDesc code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--bg-primary);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.conflictActions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.conflictBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  padding: 10px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  transition: background 0.1s, border-color 0.1s;
+}
+.conflictBtn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+}
+.conflictBtn.danger:hover {
+  border-color: #f48771;
+}
+
+.conflictBtnTitle {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.conflictBtnDesc {
+  font-size: 11px;
+  color: var(--text-muted);
 }

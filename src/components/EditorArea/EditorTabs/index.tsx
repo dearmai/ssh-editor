@@ -1,50 +1,94 @@
-import { X } from 'lucide-react';
-import { useEditorStore } from '../../../stores/editorStore';
+import { Columns2, Rows2, SplitSquareHorizontal, SplitSquareVertical, X } from 'lucide-react';
+import { useEditorStore, type EditorGroup } from '../../../stores/editorStore';
 import styles from './EditorTabs.module.css';
 
-interface Props {
-  pane: 'left' | 'right';
-}
+export default function EditorTabs({ group }: { group: EditorGroup }) {
+  const tabsById = useEditorStore((s) => s.tabsById);
+  const groupsLen = useEditorStore((s) => s.groups.length);
+  const splitDirection = useEditorStore((s) => s.splitDirection);
+  const setActiveTab = useEditorStore((s) => s.setActiveTab);
+  const closeTab = useEditorStore((s) => s.closeTab);
+  const splitActive = useEditorStore((s) => s.splitActive);
+  const setSplitDirection = useEditorStore((s) => s.setSplitDirection);
+  const closeGroup = useEditorStore((s) => s.closeGroup);
 
-export default function EditorTabs({ pane }: Props) {
-  const { tabs, activeTabId, rightPaneTabId, setActiveTab, closeTab, moveToSplit, closeSplitView } =
-    useEditorStore();
-
-  const currentTabId = pane === 'left' ? activeTabId : rightPaneTabId;
-
-  if (tabs.length === 0) return <div className={styles.emptyBar} />;
+  if (group.tabIds.length === 0) return <div className={styles.emptyBar} />;
 
   return (
     <div className={styles.bar}>
       <div className={styles.tabs}>
-        {tabs.map((tab) => (
-          <div
-            key={tab.id}
-            className={`${styles.tab} ${tab.id === currentTabId ? styles.active : ''}`}
-            onClick={() => setActiveTab(tab.id)}
-            onDoubleClick={() => moveToSplit(tab.id)}
-            title={tab.remotePath}
-          >
-            {tab.isDirty && <span className={styles.dirty} title="저장되지 않은 변경사항" />}
-            <span className={styles.name}>{tab.fileName}</span>
-            <button
-              className={styles.close}
-              onClick={(e) => {
-                e.stopPropagation();
-                closeTab(tab.id);
+        {group.tabIds.map((id) => {
+          const tab = tabsById[id];
+          if (!tab) return null;
+          return (
+            <div
+              key={id}
+              className={`${styles.tab} ${id === group.activeTabId ? styles.active : ''}`}
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData(
+                  'application/x-editor-tab',
+                  JSON.stringify({ tabId: id, groupId: group.id })
+                );
+                e.dataTransfer.effectAllowed = 'move';
               }}
-              title="탭 닫기"
+              onClick={() => setActiveTab(group.id, id)}
+              title={tab.remotePath}
             >
-              <X size={12} />
-            </button>
-          </div>
-        ))}
+              {tab.isDirty && <span className={styles.dirty} title="저장되지 않은 변경사항" />}
+              <span className={styles.name}>{tab.fileName}</span>
+              <button
+                className={styles.close}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeTab(group.id, id);
+                }}
+                title="탭 닫기"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          );
+        })}
       </div>
+
       <div className={styles.actions}>
-        {pane === 'right' && (
-          <button className={styles.actionBtn} onClick={closeSplitView} title="분할 뷰 닫기">
-            <X size={13} />
-          </button>
+        {groupsLen === 1 ? (
+          <>
+            <button
+              className={styles.actionBtn}
+              onClick={() => splitActive('horizontal')}
+              title="가로 분할 (좌우)"
+            >
+              <SplitSquareHorizontal size={15} />
+            </button>
+            <button
+              className={styles.actionBtn}
+              onClick={() => splitActive('vertical')}
+              title="세로 분할 (위아래)"
+            >
+              <SplitSquareVertical size={15} />
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              className={styles.actionBtn}
+              onClick={() =>
+                setSplitDirection(splitDirection === 'horizontal' ? 'vertical' : 'horizontal')
+              }
+              title="분할 방향 전환"
+            >
+              {splitDirection === 'horizontal' ? <Rows2 size={14} /> : <Columns2 size={14} />}
+            </button>
+            <button
+              className={styles.actionBtn}
+              onClick={() => closeGroup(group.id)}
+              title="이 패널 닫기"
+            >
+              <X size={14} />
+            </button>
+          </>
         )}
       </div>
     </div>

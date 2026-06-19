@@ -1,6 +1,6 @@
 use crate::error::AppResult;
-use crate::ssh::{sftp, FileEntry, SshConnectionPool};
-use tauri::State;
+use crate::ssh::{sftp, transfer, FileEntry, FileStat, ProbeResult, SshConnectionPool};
+use tauri::{AppHandle, State};
 
 #[tauri::command]
 pub async fn sftp_list_dir(
@@ -28,9 +28,19 @@ pub async fn sftp_write_file(
     path: String,
     content: String,
     pool: State<'_, SshConnectionPool>,
-) -> AppResult<()> {
+) -> AppResult<FileStat> {
     let session = pool.get(&session_id)?;
     sftp::write_file(&session, &path, &content).await
+}
+
+#[tauri::command]
+pub async fn sftp_stat(
+    session_id: String,
+    path: String,
+    pool: State<'_, SshConnectionPool>,
+) -> AppResult<FileStat> {
+    let session = pool.get(&session_id)?;
+    sftp::stat(&session, &path).await
 }
 
 #[tauri::command]
@@ -72,4 +82,54 @@ pub async fn sftp_create_dir(
 ) -> AppResult<()> {
     let session = pool.get(&session_id)?;
     sftp::create_dir(&session, &path).await
+}
+
+#[tauri::command]
+pub async fn sftp_probe(
+    session_id: String,
+    path: String,
+    pool: State<'_, SshConnectionPool>,
+) -> AppResult<ProbeResult> {
+    let session = pool.get(&session_id)?;
+    transfer::probe(&session, &path).await
+}
+
+#[tauri::command]
+pub async fn sftp_upload(
+    session_id: String,
+    local_path: String,
+    remote_path: String,
+    transfer_id: String,
+    app: AppHandle,
+    pool: State<'_, SshConnectionPool>,
+) -> AppResult<()> {
+    let session = pool.get(&session_id)?;
+    transfer::upload(&app, &session, &local_path, &remote_path, &transfer_id).await
+}
+
+#[tauri::command]
+pub async fn sftp_download(
+    session_id: String,
+    remote_path: String,
+    local_path: String,
+    transfer_id: String,
+    app: AppHandle,
+    pool: State<'_, SshConnectionPool>,
+) -> AppResult<()> {
+    let session = pool.get(&session_id)?;
+    transfer::download_file(&app, &session, &remote_path, &local_path, &transfer_id).await
+}
+
+#[tauri::command]
+pub async fn sftp_download_dir(
+    session_id: String,
+    remote_path: String,
+    local_path: String,
+    format: String,
+    transfer_id: String,
+    app: AppHandle,
+    pool: State<'_, SshConnectionPool>,
+) -> AppResult<()> {
+    let session = pool.get(&session_id)?;
+    transfer::download_dir(&app, &session, &remote_path, &local_path, &format, &transfer_id).await
 }

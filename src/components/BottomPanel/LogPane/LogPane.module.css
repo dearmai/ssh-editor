@@ -17,10 +17,32 @@
   gap: 8px;
 }
 
+.filters {
+  display: flex;
+  gap: 2px;
+}
+
+.filterBtn {
+  padding: 2px 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  border-radius: 3px;
+}
+.filterBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.filterActive {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+
 .count {
   flex: 1;
   color: var(--text-muted);
   font-size: 11px;
+  text-align: right;
+  padding-right: 8px;
 }
 
 .clearBtn {

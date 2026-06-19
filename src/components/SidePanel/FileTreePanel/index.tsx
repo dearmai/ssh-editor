@@ -1,4 +1,5 @@
 import {
+  Check,
   ChevronDown,
   ChevronRight,
   File,
@@ -6,42 +7,128 @@ import {
   Folder,
   FolderOpen,
   FolderPlus,
+  Download,
+  FileArchive,
+  Folders,
+  Loader2,
+  Pencil,
+  Plus,
   RefreshCw,
+  Server,
   Trash2,
+  Upload,
+  X,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useConnectionStore } from '../../../stores/connectionStore';
 import { useEditorStore } from '../../../stores/editorStore';
 import { useFileTreeStore } from '../../../stores/fileTreeStore';
-import type { FileEntry } from '../../../types';
+import { useTransferStore } from '../../../stores/transferStore';
+import type { ConnectionProfile, FileEntry } from '../../../types';
 import styles from './FileTreePanel.module.css';
 
 export default function FileTreePanel() {
-  const { selectedSessionId, activeConnections } = useConnectionStore();
+  const { selectedSessionId, activeConnections, saveActiveDirectories } = useConnectionStore();
   const { rootPaths, loadDir, setRootPath } = useFileTreeStore();
+  const [editingPath, setEditingPath] = useState(false);
 
   const conn = activeConnections.find((c) => c.sessionId === selectedSessionId);
 
   if (!selectedSessionId || !conn) {
-    return (
-      <div className={styles.empty}>
-        <p>연결을 선택하세요.</p>
-      </div>
-    );
+    return <EmptyServerList />;
   }
 
   const rootPath = rootPaths.get(selectedSessionId) ?? '/';
+  const dirs = conn.profile.directories ?? [];
+  const isSavedBase = dirs.includes(rootPath);
 
   const handlePathChange = async (newPath: string) => {
-    setRootPath(selectedSessionId, newPath);
-    await loadDir(selectedSessionId, newPath);
+    const p = newPath.trim() || '/';
+    setRootPath(selectedSessionId, p);
+    await loadDir(selectedSessionId, p);
+  };
+
+  const addCurrentAsBase = () => {
+    if (dirs.includes(rootPath)) return;
+    saveActiveDirectories(selectedSessionId, [...dirs, rootPath]);
+  };
+  const removeBase = (dir: string) => {
+    saveActiveDirectories(
+      selectedSessionId,
+      dirs.filter((d) => d !== dir)
+    );
   };
 
   return (
     <div className={styles.panel}>
       <div className={styles.header}>
-        <PathBar path={rootPath} onNavigate={handlePathChange} />
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger asChild>
+            <button className={styles.iconBtn} title="시작 디렉토리 관리">
+              <Folders size={14} />
+            </button>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content className={styles.dirMenu} sideOffset={4} align="start">
+              <div className={styles.dirMenuTitle}>시작 디렉토리</div>
+              {dirs.length === 0 && (
+                <div className={styles.dirEmpty}>저장된 디렉토리가 없습니다</div>
+              )}
+              {dirs.map((dir) => (
+                <div key={dir} className={styles.dirRow}>
+                  <button
+                    className={styles.dirRowMain}
+                    onClick={() => handlePathChange(dir)}
+                    title={dir}
+                  >
+                    <span className={styles.dirCheck}>
+                      {rootPath === dir && <Check size={12} />}
+                    </span>
+                    <FolderOpen size={12} />
+                    <span className={styles.dirText}>{dir}</span>
+                  </button>
+                  <button
+                    className={styles.dirRemove}
+                    onClick={() => removeBase(dir)}
+                    title="목록에서 제거"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+              <div className={styles.separator} />
+              <DropdownMenu.Item
+                className={`${styles.dirMenuItem} ${isSavedBase ? styles.disabled : ''}`}
+                disabled={isSavedBase}
+                onSelect={addCurrentAsBase}
+              >
+                <Plus size={12} /> 현재 폴더를 시작 디렉토리로 추가
+              </DropdownMenu.Item>
+              <DropdownMenu.Item
+                className={styles.dirMenuItem}
+                onSelect={() => setTimeout(() => setEditingPath(true), 0)}
+              >
+                <Pencil size={12} /> 경로 직접 입력…
+              </DropdownMenu.Item>
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
+
+        <PathBar
+          path={rootPath}
+          editing={editingPath}
+          setEditing={setEditingPath}
+          onNavigate={handlePathChange}
+        />
+        <button
+          className={styles.iconBtn}
+          title="이 디렉토리에 파일 업로드"
+          onClick={() => useTransferStore.getState().uploadFiles(selectedSessionId, rootPath)}
+        >
+          <Upload size={13} />
+        </button>
         <button
           className={styles.iconBtn}
           title="새로 고침"
@@ -51,23 +138,113 @@ export default function FileTreePanel() {
         </button>
       </div>
       <div className={styles.tree}>
-        <FileTreeNode
-          connectionId={selectedSessionId}
-          path={rootPath}
-          isRoot
-        />
+        <FileTreeNode connectionId={selectedSessionId} path={rootPath} isRoot />
       </div>
     </div>
   );
 }
 
-function PathBar({ path, onNavigate }: { path: string; onNavigate: (p: string) => void }) {
-  const [editing, setEditing] = useState(false);
+function EmptyServerList() {
+  const { profiles, connect } = useConnectionStore();
+  const { setRootPath, loadDir } = useFileTreeStore();
+  const [connecting, setConnecting] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleConnect = async (profile: ConnectionProfile, startPath?: string) => {
+    setConnecting(profile.id);
+    setError(null);
+    try {
+      const sessionId = await connect(profile);
+      const rootPath =
+        startPath ?? profile.directories?.[0] ?? profile.lastPath ?? `/home/${profile.username || 'root'}`;
+      setRootPath(sessionId, rootPath);
+      await loadDir(sessionId, rootPath);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setConnecting(null);
+    }
+  };
+
+  if (profiles.length === 0) {
+    return (
+      <div className={styles.empty}>
+        <p>연결된 서버가 없습니다.</p>
+        <p>중앙 화면에서 새 연결을 추가하세요.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.serverList}>
+      <div className={styles.serverListTitle}>저장된 서버</div>
+      {error && (
+        <div className={styles.serverError} onClick={() => setError(null)}>
+          {error}
+        </div>
+      )}
+      {profiles.map((p) => {
+        const dirs = p.directories ?? [];
+        return (
+          <div key={p.id} className={styles.serverGroup}>
+            <button
+              className={styles.serverItem}
+              onClick={() => handleConnect(p)}
+              disabled={!!connecting}
+              title={`${p.username}@${p.hostname}`}
+            >
+              {connecting === p.id ? (
+                <Loader2 size={13} className={styles.spin} />
+              ) : (
+                <Server size={13} />
+              )}
+              <span className={styles.serverName}>{p.name.split('/').pop() ?? p.name}</span>
+              <span className={styles.serverHost}>{p.hostname}</span>
+            </button>
+            {dirs.length > 0 && (
+              <div className={styles.serverDirs}>
+                {dirs.map((dir) => (
+                  <button
+                    key={dir}
+                    className={styles.serverDirChip}
+                    onClick={() => handleConnect(p, dir)}
+                    disabled={!!connecting}
+                    title={`${dir} 에서 열기`}
+                  >
+                    <FolderOpen size={10} />
+                    {dir.split('/').filter(Boolean).pop() ?? dir}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function PathBar({
+  path,
+  editing,
+  setEditing,
+  onNavigate,
+}: {
+  path: string;
+  editing: boolean;
+  setEditing: (v: boolean) => void;
+  onNavigate: (p: string) => void;
+}) {
   const [value, setValue] = useState(path);
+
+  // 외부에서 경로가 바뀌면 입력값도 동기화
+  useEffect(() => {
+    setValue(path);
+  }, [path]);
 
   const handleSubmit = () => {
     setEditing(false);
-    if (value !== path) onNavigate(value);
+    if (value.trim() !== path) onNavigate(value);
   };
 
   if (editing) {
@@ -79,7 +256,10 @@ function PathBar({ path, onNavigate }: { path: string; onNavigate: (p: string) =
         onBlur={handleSubmit}
         onKeyDown={(e) => {
           if (e.key === 'Enter') handleSubmit();
-          if (e.key === 'Escape') setEditing(false);
+          if (e.key === 'Escape') {
+            setValue(path);
+            setEditing(false);
+          }
         }}
         autoFocus
       />
@@ -87,7 +267,15 @@ function PathBar({ path, onNavigate }: { path: string; onNavigate: (p: string) =
   }
 
   return (
-    <span className={styles.pathDisplay} onClick={() => { setValue(path); setEditing(true); }}>
+    <span
+      className={styles.pathDisplay}
+      onClick={() => {
+        setValue(path);
+        setEditing(true);
+      }}
+      title="클릭하여 base 디렉토리 경로 편집"
+    >
+      <Pencil size={10} className={styles.pathEditIcon} />
       {path}
     </span>
   );
@@ -250,6 +438,55 @@ function FileTreeItem({
               <ContextMenu.Separator className={styles.separator} />
             </>
           )}
+
+          {/* 다운로드 */}
+          {entry.isDir ? (
+            <ContextMenu.Sub>
+              <ContextMenu.SubTrigger className={styles.contextItem}>
+                <FileArchive size={12} /> 다운로드 (압축)
+                <ChevronRight size={12} style={{ marginLeft: 'auto' }} />
+              </ContextMenu.SubTrigger>
+              <ContextMenu.Portal>
+                <ContextMenu.SubContent className={styles.contextMenu}>
+                  <ContextMenu.Item
+                    className={styles.contextItem}
+                    onSelect={() =>
+                      useTransferStore.getState().downloadDir(connectionId, entry.path, entry.name, 'zip')
+                    }
+                  >
+                    ZIP (.zip)
+                  </ContextMenu.Item>
+                  <ContextMenu.Item
+                    className={styles.contextItem}
+                    onSelect={() =>
+                      useTransferStore.getState().downloadDir(connectionId, entry.path, entry.name, 'targz')
+                    }
+                  >
+                    TAR.GZ (.tar.gz)
+                  </ContextMenu.Item>
+                  <ContextMenu.Item
+                    className={styles.contextItem}
+                    onSelect={() =>
+                      useTransferStore.getState().downloadDir(connectionId, entry.path, entry.name, 'tarxz')
+                    }
+                  >
+                    TAR.XZ (.tar.xz)
+                  </ContextMenu.Item>
+                </ContextMenu.SubContent>
+              </ContextMenu.Portal>
+            </ContextMenu.Sub>
+          ) : (
+            <ContextMenu.Item
+              className={styles.contextItem}
+              onSelect={() =>
+                useTransferStore.getState().downloadFile(connectionId, entry.path, entry.name)
+              }
+            >
+              <Download size={12} /> 다운로드
+            </ContextMenu.Item>
+          )}
+
+          <ContextMenu.Separator className={styles.separator} />
           <ContextMenu.Item
             className={`${styles.contextItem} ${styles.danger}`}
             onSelect={onDelete}

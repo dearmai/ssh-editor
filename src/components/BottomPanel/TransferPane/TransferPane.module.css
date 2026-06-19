@@ -1,0 +1,154 @@
+.pane {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-primary);
+  font-size: 12px;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.count {
+  flex: 1;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.clearBtn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.clearBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 12px;
+}
+.item:hover {
+  background: var(--bg-hover);
+}
+
+.icon {
+  width: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--text-secondary);
+}
+.done { color: #4ec9b0; }
+.error { color: #f48771; }
+
+.spin {
+  animation: spin 1s linear infinite;
+  color: var(--accent);
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.kind {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.name {
+  flex: 1;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.barTrack {
+  height: 4px;
+  background: var(--bg-active);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.barFill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.15s ease;
+}
+.barError {
+  background: #f48771;
+}
+.indeterminate {
+  animation: slide 1.2s ease-in-out infinite;
+}
+@keyframes slide {
+  0% { margin-left: 0%; }
+  50% { margin-left: 60%; }
+  100% { margin-left: 0%; }
+}
+
+.errMsg {
+  font-size: 11px;
+  color: #f48771;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pct {
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  width: 34px;
+  text-align: right;
+}

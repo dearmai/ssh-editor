@@ -1,10 +1,13 @@
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
-import { Terminal } from '@xterm/xterm';
+import { Terminal, type ITheme } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
 import { useEffect, useRef } from 'react';
 import { onTerminalData } from '../../../ipc/events';
 import { terminalWrite, terminalResize } from '../../../ipc/commands';
+import { useSettingsStore } from '../../../stores/settingsStore';
+import { useTerminalStore } from '../../../stores/terminalStore';
+import { getTheme } from '../../../themes';
 import styles from './Terminal.module.css';
 
 interface Props {
@@ -17,18 +20,39 @@ export default function TerminalPane({ sessionId, connectionId: _connectionId }:
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
 
+  const editorFontFamily = useSettingsStore((s) => s.editorFontFamily);
+  const editorFontSize = useSettingsStore((s) => s.editorFontSize);
+  const resolvedTheme = useSettingsStore((s) => s.resolvedTheme);
+  const darkTheme = useSettingsStore((s) => s.darkTheme);
+  const lightTheme = useSettingsStore((s) => s.lightTheme);
+  // 터미널 개별 테마 오버라이드 (없으면 앱 테마)
+  const sessionTheme = useTerminalStore(
+    (s) => s.sessions.find((x) => x.id === sessionId)?.theme
+  );
+  const effectiveType = sessionTheme ?? resolvedTheme;
+  const termTheme: ITheme = getTheme(
+    effectiveType === 'dark' ? darkTheme : lightTheme,
+    effectiveType
+  ).terminal;
+
+  // 폰트/테마 변경 시 기존 터미널에 반영
+  useEffect(() => {
+    const term = termRef.current;
+    if (!term) return;
+    term.options.fontFamily = editorFontFamily;
+    term.options.fontSize = editorFontSize;
+    term.options.theme = termTheme;
+    fitRef.current?.fit();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editorFontFamily, editorFontSize, termTheme]);
+
   useEffect(() => {
     if (!containerRef.current) return;
 
     const term = new Terminal({
-      theme: {
-        background: '#1e1e1e',
-        foreground: '#cccccc',
-        cursor: '#aeafad',
-        selectionBackground: '#264f78',
-      },
-      fontSize: 13,
-      fontFamily: "'SF Mono', 'Fira Code', Menlo, monospace",
+      theme: termTheme,
+      fontSize: editorFontSize,
+      fontFamily: editorFontFamily,
       scrollback: 5000,
       cursorBlink: true,
     });

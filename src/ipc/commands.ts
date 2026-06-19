@@ -1,8 +1,12 @@
 import { invoke } from '@tauri-apps/api/core';
 import type {
   ActiveConnection,
+  ArchiveFormat,
   ConnectionProfile,
   FileEntry,
+  FileStat,
+  PingInfo,
+  ProbeResult,
   SshConfigHost,
   StartupArgs,
 } from '../types';
@@ -13,6 +17,12 @@ export const sshConnect = (profile: ConnectionProfile) =>
 
 export const sshDisconnect = (sessionId: string) =>
   invoke<void>('ssh_disconnect', { sessionId });
+
+export const sshPing = (sessionId: string) =>
+  invoke<PingInfo>('ssh_ping', { sessionId });
+
+export const openNewWindow = () =>
+  invoke<void>('open_new_window');
 
 export const getActiveConnections = () =>
   invoke<ActiveConnection[]>('get_active_connections');
@@ -38,7 +48,10 @@ export const sftpReadFile = (sessionId: string, path: string) =>
   invoke<string>('sftp_read_file', { sessionId, path });
 
 export const sftpWriteFile = (sessionId: string, path: string, content: string) =>
-  invoke<void>('sftp_write_file', { sessionId, path, content });
+  invoke<FileStat>('sftp_write_file', { sessionId, path, content });
+
+export const sftpStat = (sessionId: string, path: string) =>
+  invoke<FileStat>('sftp_stat', { sessionId, path });
 
 export const sftpCreateFile = (sessionId: string, path: string) =>
   invoke<void>('sftp_create_file', { sessionId, path });
@@ -51,6 +64,32 @@ export const sftpRenamePath = (sessionId: string, from: string, to: string) =>
 
 export const sftpCreateDir = (sessionId: string, path: string) =>
   invoke<void>('sftp_create_dir', { sessionId, path });
+
+// --- 전송 (업로드/다운로드) ---
+export const sftpProbe = (sessionId: string, path: string) =>
+  invoke<ProbeResult>('sftp_probe', { sessionId, path });
+
+export const sftpUpload = (
+  sessionId: string,
+  localPath: string,
+  remotePath: string,
+  transferId: string
+) => invoke<void>('sftp_upload', { sessionId, localPath, remotePath, transferId });
+
+export const sftpDownload = (
+  sessionId: string,
+  remotePath: string,
+  localPath: string,
+  transferId: string
+) => invoke<void>('sftp_download', { sessionId, remotePath, localPath, transferId });
+
+export const sftpDownloadDir = (
+  sessionId: string,
+  remotePath: string,
+  localPath: string,
+  format: ArchiveFormat,
+  transferId: string
+) => invoke<void>('sftp_download_dir', { sessionId, remotePath, localPath, format, transferId });
 
 // --- 터미널 ---
 export const terminalCreate = (connectionId: string, cols: number, rows: number) =>

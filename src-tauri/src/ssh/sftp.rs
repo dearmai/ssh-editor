@@ -16,6 +16,13 @@ pub struct FileEntry {
     pub permissions: Option<u32>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileStat {
+    pub size: u64,
+    pub mtime: Option<u64>,
+}
+
 pub async fn list_dir(session: &SshSession, path: &str) -> AppResult<Vec<FileEntry>> {
     let sftp_guard = session.sftp.lock().await;
     let sftp = sftp_guard
@@ -77,7 +84,20 @@ pub async fn read_file(session: &SshSession, path: &str) -> AppResult<String> {
         .map_err(|_| AppError::Other("바이너리 파일은 편집할 수 없습니다".to_string()))
 }
 
-pub async fn write_file(session: &SshSession, path: &str, content: &str) -> AppResult<()> {
+pub async fn stat(session: &SshSession, path: &str) -> AppResult<FileStat> {
+    let sftp_guard = session.sftp.lock().await;
+    let sftp = sftp_guard
+        .as_ref()
+        .ok_or_else(|| AppError::Other("SFTP 세션이 없습니다".to_string()))?;
+
+    let m = sftp.metadata(path).await?;
+    Ok(FileStat {
+        size: m.size.unwrap_or(0),
+        mtime: m.mtime.map(|t| t as u64),
+    })
+}
+
+pub async fn write_file(session: &SshSession, path: &str, content: &str) -> AppResult<FileStat> {
     let sftp_guard = session.sftp.lock().await;
     let sftp = sftp_guard
         .as_ref()
@@ -86,7 +106,13 @@ pub async fn write_file(session: &SshSession, path: &str, content: &str) -> AppR
     let mut file = sftp.create(path).await?;
     file.write_all(content.as_bytes()).await?;
     file.flush().await?;
-    Ok(())
+    drop(file);
+
+    let m = sftp.metadata(path).await?;
+    Ok(FileStat {
+        size: m.size.unwrap_or(0),
+        mtime: m.mtime.map(|t| t as u64),
+    })
 }
 
 pub async fn create_file(session: &SshSession, path: &str) -> AppResult<()> {

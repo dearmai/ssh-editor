@@ -1,6 +1,8 @@
 import Editor from '@monaco-editor/react';
 import { useCallback, useEffect } from 'react';
 import { useEditorStore } from '../../../stores/editorStore';
+import { useSettingsStore } from '../../../stores/settingsStore';
+import { defineMonacoThemes, getTheme, monacoThemeName } from '../../../themes';
 import styles from './MonacoPane.module.css';
 
 interface Props {
@@ -8,8 +10,17 @@ interface Props {
 }
 
 export default function MonacoPane({ tabId }: Props) {
-  const { tabs, updateContent, saveTab } = useEditorStore();
-  const tab = tabs.find((t) => t.id === tabId);
+  const updateContent = useEditorStore((s) => s.updateContent);
+  const saveTab = useEditorStore((s) => s.saveTab);
+  const tab = useEditorStore((s) => s.tabsById[tabId]);
+  const editorFontFamily = useSettingsStore((s) => s.editorFontFamily);
+  const editorFontSize = useSettingsStore((s) => s.editorFontSize);
+  const resolvedTheme = useSettingsStore((s) => s.resolvedTheme);
+  const darkTheme = useSettingsStore((s) => s.darkTheme);
+  const lightTheme = useSettingsStore((s) => s.lightTheme);
+
+  const colorTheme = getTheme(resolvedTheme === 'dark' ? darkTheme : lightTheme, resolvedTheme);
+  const monacoTheme = monacoThemeName(colorTheme);
 
   const handleSave = useCallback(async () => {
     await saveTab(tabId);
@@ -34,13 +45,14 @@ export default function MonacoPane({ tabId }: Props) {
         key={tab.id}
         value={tab.content}
         language={tab.language}
-        theme="vs-dark"
+        theme={monacoTheme}
+        beforeMount={(monaco) => defineMonacoThemes(monaco)}
         onChange={(value) => {
           if (value !== undefined) updateContent(tab.id, value);
         }}
         options={{
-          fontSize: 14,
-          fontFamily: "'SF Mono', 'Fira Code', Menlo, monospace",
+          fontSize: editorFontSize,
+          fontFamily: editorFontFamily,
           lineNumbers: 'on',
           minimap: { enabled: true, scale: 1 },
           wordWrap: 'off',

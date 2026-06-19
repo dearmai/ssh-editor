@@ -1,5 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { ChevronDown, Download, X } from 'lucide-react';
+import { ChevronDown, Download, Plus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useConnectionStore } from '../../stores/connectionStore';
 import { useFileTreeStore } from '../../stores/fileTreeStore';
@@ -25,6 +25,7 @@ export default function NewConnectionDialog({ open, onClose }: Props) {
     identityFile: '',
     saveProfile: true,
   });
+  const [directories, setDirectories] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -58,6 +59,7 @@ export default function NewConnectionDialog({ open, onClose }: Props) {
     setLoading(true);
     setError('');
 
+    const dirs = directories.map((d) => d.trim()).filter(Boolean);
     const profile: ConnectionProfile = {
       id: crypto.randomUUID(),
       name: form.name || `${form.username}@${form.hostname}`,
@@ -67,6 +69,7 @@ export default function NewConnectionDialog({ open, onClose }: Props) {
       authType: form.authType,
       password: form.authType === 'password' ? form.password : undefined,
       identityFile: form.authType === 'publicKey' ? form.identityFile.trim() : undefined,
+      directories: dirs,
     };
 
     try {
@@ -74,7 +77,7 @@ export default function NewConnectionDialog({ open, onClose }: Props) {
         await addProfile(profile);
       }
       const sessionId = await connect(profile);
-      const rootPath = `/home/${profile.username || 'root'}`;
+      const rootPath = dirs[0] ?? `/home/${profile.username || 'root'}`;
       setRootPath(sessionId, rootPath);
       await loadDir(sessionId, rootPath);
       onClose();
@@ -235,6 +238,41 @@ export default function NewConnectionDialog({ open, onClose }: Props) {
                 />
               </div>
             )}
+
+            {/* 시작 디렉토리 (복수) */}
+            <div className={styles.field}>
+              <label className={styles.label}>
+                시작 디렉토리 (선택, 복수 가능 · 첫 번째가 기본)
+              </label>
+              {directories.map((dir, i) => (
+                <div key={i} className={styles.row} style={{ gap: 6 }}>
+                  <input
+                    value={dir}
+                    onChange={(e) =>
+                      setDirectories((arr) => arr.map((d, j) => (j === i ? e.target.value : d)))
+                    }
+                    placeholder="/var/www 또는 /home/ubuntu/project"
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    type="button"
+                    className={styles.iconRemoveBtn}
+                    onClick={() => setDirectories((arr) => arr.filter((_, j) => j !== i))}
+                    title="제거"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className={styles.addDirBtn}
+                onClick={() => setDirectories((arr) => [...arr, ''])}
+              >
+                <Plus size={13} />
+                디렉토리 추가
+              </button>
+            </div>
 
             <label className={styles.checkLabel}>
               <input

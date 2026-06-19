@@ -1,8 +1,8 @@
 use crate::config::{parse_ssh_config, ConnectionProfile, SshConfigHost};
 use crate::error::{AppError, AppResult};
-use crate::ssh::{ssh_connect_inner, SshConnectionPool};
+use crate::ssh::{ping_server, ssh_connect_inner, PingInfo, SshConnectionPool};
 use serde::{Deserialize, Serialize};
-use tauri::State;
+use tauri::{State, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_store::StoreExt;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,6 +47,27 @@ pub async fn get_active_connections(
         })
         .collect();
     Ok(conns)
+}
+
+#[tauri::command]
+pub async fn ssh_ping(
+    session_id: String,
+    pool: State<'_, SshConnectionPool>,
+) -> AppResult<PingInfo> {
+    let session = pool.get(&session_id)?;
+    ping_server(&session).await
+}
+
+#[tauri::command]
+pub async fn open_new_window(app: tauri::AppHandle) -> AppResult<()> {
+    let label = format!("win-{}", uuid::Uuid::new_v4());
+    WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
+        .title("SSH Editor")
+        .inner_size(1400.0, 900.0)
+        .min_inner_size(960.0, 640.0)
+        .build()
+        .map_err(|e| AppError::Other(format!("새 창 생성 실패: {}", e)))?;
+    Ok(())
 }
 
 #[tauri::command]

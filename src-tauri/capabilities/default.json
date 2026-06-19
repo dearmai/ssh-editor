@@ -1,12 +1,15 @@
 {
   "identifier": "default",
   "description": "Default capabilities for SSH Editor",
-  "windows": ["main"],
+  "windows": ["main", "win-*"],
   "permissions": [
     "core:default",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "core:event:allow-emit",
-    "store:default"
+    "store:default",
+    "dialog:default",
+    "dialog:allow-open",
+    "dialog:allow-save"
   ]
 }

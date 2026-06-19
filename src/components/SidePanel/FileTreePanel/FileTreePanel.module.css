@@ -15,18 +15,31 @@
 }
 
 .pathDisplay {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   flex: 1;
   font-size: 11px;
   color: var(--text-secondary);
-  padding: 2px 4px;
-  border-radius: 2px;
+  padding: 2px 6px;
+  border-radius: 3px;
   cursor: text;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  border: 1px solid transparent;
 }
 .pathDisplay:hover {
   background: var(--bg-hover);
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+.pathEditIcon {
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+.pathDisplay:hover .pathEditIcon {
+  opacity: 1;
 }
 
 .pathInput {
@@ -105,6 +118,107 @@
   text-align: center;
   color: var(--text-muted);
   font-size: 12px;
+  line-height: 1.8;
+}
+
+/* 빈 상태 서버 목록 */
+.serverList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  overflow-y: auto;
+}
+
+.serverListTitle {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-weight: 600;
+  padding: 4px 4px 2px;
+}
+
+.serverError {
+  font-size: 11px;
+  color: #f48771;
+  background: rgba(244, 135, 113, 0.12);
+  border: 1px solid rgba(244, 135, 113, 0.3);
+  border-radius: 4px;
+  padding: 6px 8px;
+  cursor: pointer;
+  word-break: break-word;
+}
+
+.serverGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.serverItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  text-align: left;
+}
+.serverItem:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+}
+.serverItem:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.serverName {
+  flex: 1;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.serverHost {
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 45%;
+}
+
+.serverDirs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 4px 4px 24px;
+}
+
+.serverDirChip {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+.serverDirChip:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+.serverDirChip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .spin {
@@ -149,4 +263,107 @@
   height: 1px;
   background: var(--border);
   margin: 4px 0;
+}
+
+/* 디렉토리 전환 메뉴 */
+.dirMenu {
+  min-width: 200px;
+  max-width: 360px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  z-index: 300;
+}
+
+.dirMenuTitle {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-weight: 600;
+  padding: 6px 8px 3px;
+}
+
+.dirMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  font-size: 12px;
+  color: var(--text-primary);
+  border-radius: 4px;
+  cursor: pointer;
+  outline: none;
+}
+.dirMenuItem[data-highlighted] {
+  background: var(--accent);
+  color: #fff;
+}
+.dirMenuItem.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.dirMenuItem.disabled[data-highlighted] {
+  background: transparent;
+  color: var(--text-primary);
+}
+
+.dirEmpty {
+  padding: 4px 8px 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* 디렉토리 행 (이동 + 제거) */
+.dirRow {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.dirRowMain {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  font-size: 12px;
+  color: var(--text-primary);
+  border-radius: 4px;
+  text-align: left;
+}
+.dirRowMain:hover {
+  background: var(--bg-hover);
+}
+
+.dirRemove {
+  width: 22px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.dirRemove:hover {
+  background: rgba(244, 135, 113, 0.15);
+  color: #f48771;
+}
+
+.dirCheck {
+  width: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dirText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

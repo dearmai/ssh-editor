@@ -1,19 +1,25 @@
-import { Plus, X } from 'lucide-react';
+import { Moon, Plus, Sun, X } from 'lucide-react';
 import { useState } from 'react';
 import { useConnectionStore } from '../../stores/connectionStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { useTerminalStore } from '../../stores/terminalStore';
+import { useTransferStore } from '../../stores/transferStore';
 import LogPane from './LogPane';
+import TransferPane from './TransferPane';
 import TerminalPane from './Terminal';
 import styles from './BottomPanel.module.css';
 
-type ActiveTab = { kind: 'log' } | { kind: 'terminal'; id: string };
+type ActiveTab = { kind: 'log' } | { kind: 'transfer' } | { kind: 'terminal'; id: string };
 
 export default function BottomPanel() {
-  const { sessions, setActiveSession, closeSession, createSession, toggleBottomPanel } =
+  const { sessions, setActiveSession, closeSession, createSession, setTerminalTheme } =
     useTerminalStore();
   const { selectedSessionId } = useConnectionStore();
+  const resolvedTheme = useSettingsStore((s) => s.resolvedTheme);
+  const activeTransfers = useTransferStore(
+    (s) => s.transfers.filter((t) => t.status === 'active' || t.status === 'queued').length
+  );
 
-  // "log" or terminal session id
   const [activeTab, setActiveTab] = useState<ActiveTab>({ kind: 'log' });
 
   const handleNewTerminal = async () => {
@@ -25,27 +31,36 @@ export default function BottomPanel() {
 
   const handleCloseTerminal = (sessionId: string) => {
     closeSession(sessionId);
-    // 닫은 탭이 현재 탭이면 로그로 이동
     if (activeTab.kind === 'terminal' && activeTab.id === sessionId) {
       setActiveTab({ kind: 'log' });
     }
   };
 
   const isLogActive = activeTab.kind === 'log';
+  const isTransferActive = activeTab.kind === 'transfer';
+
+  const activeTerminal =
+    activeTab.kind === 'terminal' ? sessions.find((s) => s.id === activeTab.id) : undefined;
+  const activeTerminalTheme = activeTerminal?.theme ?? resolvedTheme;
 
   return (
     <div className={styles.panel}>
       <div className={styles.header}>
         <div className={styles.tabs}>
-          {/* 로그 탭 (고정) */}
           <button
             className={`${styles.tab} ${isLogActive ? styles.active : ''}`}
             onClick={() => setActiveTab({ kind: 'log' })}
           >
             로그
           </button>
+          <button
+            className={`${styles.tab} ${isTransferActive ? styles.active : ''}`}
+            onClick={() => setActiveTab({ kind: 'transfer' })}
+          >
+            전송
+            {activeTransfers > 0 && <span className={styles.badge}>{activeTransfers}</span>}
+          </button>
 
-          {/* 터미널 탭들 */}
           {sessions.map((session) => {
             const isActive = activeTab.kind === 'terminal' && activeTab.id === session.id;
             return (
@@ -73,6 +88,17 @@ export default function BottomPanel() {
         </div>
 
         <div className={styles.actions}>
+          {activeTerminal && (
+            <button
+              className={styles.actionBtn}
+              onClick={() =>
+                setTerminalTheme(activeTerminal.id, activeTerminalTheme === 'light' ? 'dark' : 'light')
+              }
+              title="이 터미널 라이트/다크 전환"
+            >
+              {activeTerminalTheme === 'light' ? <Moon size={14} /> : <Sun size={14} />}
+            </button>
+          )}
           <button
             className={styles.actionBtn}
             onClick={handleNewTerminal}
@@ -81,19 +107,17 @@ export default function BottomPanel() {
           >
             <Plus size={14} />
           </button>
-          <button className={styles.actionBtn} onClick={toggleBottomPanel} title="패널 닫기">
-            <X size={14} />
-          </button>
         </div>
       </div>
 
       <div className={styles.content}>
-        {/* 로그 패널 */}
         <div style={{ display: isLogActive ? 'flex' : 'none', height: '100%', flexDirection: 'column' }}>
           <LogPane />
         </div>
+        <div style={{ display: isTransferActive ? 'flex' : 'none', height: '100%', flexDirection: 'column' }}>
+          <TransferPane />
+        </div>
 
-        {/* 터미널 패널들 */}
         {sessions.map((session) => {
           const isActive = activeTab.kind === 'terminal' && activeTab.id === session.id;
           return (
@@ -107,7 +131,7 @@ export default function BottomPanel() {
           );
         })}
 
-        {!isLogActive && sessions.length === 0 && (
+        {activeTab.kind === 'terminal' && sessions.length === 0 && (
           <div className={styles.empty}>
             <p>+ 버튼으로 터미널을 여세요</p>
           </div>

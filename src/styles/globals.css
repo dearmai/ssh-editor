@@ -26,6 +26,31 @@
   --font-size-base: 13px;
 }
 
+/* ── Light 테마 ─────────────────────────────── */
+:root[data-theme='light'] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f3f3f3;
+  --bg-tertiary: #ececec;
+  --bg-hover: #e8e8e8;
+  --bg-active: #dcdcdc;
+  --text-primary: #1f1f1f;
+  --text-secondary: #5a5a5a;
+  --text-muted: #8a8a8a;
+  --border: #d4d4d4;
+  --accent: #0066b8;
+  --accent-hover: #1a7ad4;
+  --activity-bar-bg: #2c2c2c;
+  --activity-bar-fg: #cccccc;
+  --activity-bar-active: #ffffff;
+  --tab-active-bg: #ffffff;
+  --tab-inactive-bg: #ececec;
+  --tab-active-border: #0066b8;
+  --dirty-dot: #c08a2b;
+  --status-bar-bg: #0066b8;
+  --status-bar-fg: #ffffff;
+  --scrollbar-thumb: #c4c4c4;
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;

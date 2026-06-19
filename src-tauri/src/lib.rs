@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use ssh::{SshConnectionPool, TerminalPool};
 use std::sync::Mutex;
 use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
-use tauri::Emitter;
+use tauri::{Emitter, WebviewUrl, WebviewWindowBuilder};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -25,6 +25,7 @@ pub struct StartupArgsState(pub Mutex<Option<StartupArgs>>);
 pub fn run(startup_args: Option<StartupArgs>) {
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
         .manage(SshConnectionPool::new())
         .manage(TerminalPool::new())
         .manage(StartupArgsState(Mutex::new(startup_args)))
@@ -32,11 +33,15 @@ pub fn run(startup_args: Option<StartupArgs>) {
             let prefs_item = MenuItemBuilder::with_id("preferences", "환경설정...")
                 .accelerator("CmdOrCtrl+,")
                 .build(app)?;
+            let new_window_item = MenuItemBuilder::with_id("new-window", "새 창")
+                .accelerator("CmdOrCtrl+Shift+N")
+                .build(app)?;
 
             let app_menu = SubmenuBuilder::new(app, "SSH Editor")
                 .about(None)
                 .separator()
                 .item(&prefs_item)
+                .item(&new_window_item)
                 .separator()
                 .services()
                 .separator()
@@ -71,10 +76,23 @@ pub fn run(startup_args: Option<StartupArgs>) {
 
             app.set_menu(menu)?;
 
-            app.on_menu_event(|app, event| {
-                if event.id() == "preferences" {
+            app.on_menu_event(|app, event| match event.id().as_ref() {
+                "preferences" => {
                     app.emit("menu-preferences", ()).ok();
                 }
+                "new-window" => {
+                    let label = format!("win-{}", uuid::Uuid::new_v4());
+                    let _ = WebviewWindowBuilder::new(
+                        app,
+                        &label,
+                        WebviewUrl::App("index.html".into()),
+                    )
+                    .title("SSH Editor")
+                    .inner_size(1400.0, 900.0)
+                    .min_inner_size(960.0, 640.0)
+                    .build();
+                }
+                _ => {}
             });
 
             Ok(())
@@ -83,6 +101,8 @@ pub fn run(startup_args: Option<StartupArgs>) {
             // 연결 관리
             ssh_connect,
             ssh_disconnect,
+            ssh_ping,
+            open_new_window,
             get_active_connections,
             load_ssh_config,
             load_profiles,
@@ -92,10 +112,15 @@ pub fn run(startup_args: Option<StartupArgs>) {
             sftp_list_dir,
             sftp_read_file,
             sftp_write_file,
+            sftp_stat,
             sftp_create_file,
             sftp_delete_path,
             sftp_rename_path,
             sftp_create_dir,
+            sftp_probe,
+            sftp_upload,
+            sftp_download,
+            sftp_download_dir,
             // 터미널
             terminal_create,
             terminal_write,

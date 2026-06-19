@@ -52,7 +52,7 @@ export default function WelcomeScreen() {
     setShowCancel(false);
   };
 
-  const handleConnect = async (profile: ConnectionProfile) => {
+  const handleConnect = async (profile: ConnectionProfile, startPath?: string) => {
     cancelledRef.current = false;
     setConnecting(profile.id);
     setShowCancel(false);
@@ -77,7 +77,8 @@ export default function WelcomeScreen() {
     try {
       const sessionId = await connect(profile);
       if (cancelledRef.current) return;
-      const rootPath = profile.lastPath ?? `/home/${profile.username || 'root'}`;
+      const rootPath =
+        startPath ?? profile.directories?.[0] ?? profile.lastPath ?? `/home/${profile.username || 'root'}`;
       setRootPath(sessionId, rootPath);
       await loadDir(sessionId, rootPath);
     } catch (e) {
@@ -142,26 +143,47 @@ export default function WelcomeScreen() {
               {profiles.map((profile) => {
                 const shortName = profile.name.split('/').pop() ?? profile.name;
                 const isConn = connecting === profile.id;
+                const dirs = profile.directories ?? [];
                 return (
-                  <button
+                  <div
                     key={profile.id}
                     className={`${styles.card} ${isConn ? styles.connecting : ''}`}
-                    onClick={() => handleConnect(profile)}
-                    disabled={!!connecting}
                   >
-                    {isConn ? (
-                      <Loader2 size={14} className={styles.cardSpinner} />
-                    ) : (
-                      <Server size={14} className={styles.cardIcon} />
+                    <button
+                      className={styles.cardMain}
+                      onClick={() => handleConnect(profile)}
+                      disabled={!!connecting}
+                    >
+                      {isConn ? (
+                        <Loader2 size={14} className={styles.cardSpinner} />
+                      ) : (
+                        <Server size={14} className={styles.cardIcon} />
+                      )}
+                      <span className={styles.cardName} title={profile.name}>
+                        {shortName}
+                      </span>
+                      <span className={styles.cardMeta}>
+                        {profile.username}@{profile.hostname}
+                        {profile.port !== 22 ? `:${profile.port}` : ''}
+                      </span>
+                    </button>
+                    {dirs.length > 0 && (
+                      <div className={styles.dirChips}>
+                        {dirs.map((dir) => (
+                          <button
+                            key={dir}
+                            className={styles.dirChip}
+                            onClick={() => handleConnect(profile, dir)}
+                            disabled={!!connecting}
+                            title={`${dir} 에서 열기`}
+                          >
+                            <FolderOpen size={11} />
+                            {dir.split('/').filter(Boolean).pop() ?? dir}
+                          </button>
+                        ))}
+                      </div>
                     )}
-                    <span className={styles.cardName} title={profile.name}>
-                      {shortName}
-                    </span>
-                    <span className={styles.cardMeta}>
-                      {profile.username}@{profile.hostname}
-                      {profile.port !== 22 ? `:${profile.port}` : ''}
-                    </span>
-                  </button>
+                  </div>
                 );
               })}
             </div>
