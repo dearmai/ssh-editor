@@ -1,0 +1,109 @@
+.emptyBar {
+  height: 35px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.bar {
+  height: 35px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.tabs {
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex: 1;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px 0 12px;
+  min-width: 80px;
+  max-width: 200px;
+  cursor: pointer;
+  border-right: 1px solid var(--border);
+  background: var(--tab-inactive-bg);
+  color: var(--text-secondary);
+  font-size: 13px;
+  user-select: none;
+  position: relative;
+  white-space: nowrap;
+}
+.tab:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.tab.active {
+  background: var(--tab-active-bg);
+  color: var(--text-primary);
+  border-top: 1px solid var(--tab-active-border);
+}
+
+.dirty {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dirty-dot);
+  flex-shrink: 0;
+}
+
+.name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.close {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+.tab:hover .close {
+  opacity: 1;
+}
+.close:hover {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+
+.actionBtn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  color: var(--text-secondary);
+}
+.actionBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}

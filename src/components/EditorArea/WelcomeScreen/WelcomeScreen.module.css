@@ -1,0 +1,213 @@
+.screen {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-y: auto;
+  padding: 40px 24px;
+  gap: 24px;
+}
+
+.appHeader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.appIcon {
+  color: var(--accent);
+  opacity: 0.7;
+}
+
+.appTitle {
+  font-size: 22px;
+  font-weight: 300;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.appSub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.error {
+  background: rgba(244, 135, 113, 0.15);
+  border: 1px solid rgba(244, 135, 113, 0.4);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #f48771;
+  max-width: 600px;
+  width: 100%;
+  cursor: pointer;
+  text-align: center;
+}
+
+.connectingBanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  max-width: 500px;
+  width: 100%;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.cardSpinner {
+  animation: spin 1s linear infinite;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.cancelBtn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  animation: fadeIn 0.2s ease;
+}
+.cancelBtn:hover {
+  background: rgba(244, 135, 113, 0.15);
+  border-color: #f48771;
+  color: #f48771;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.empty {
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+  line-height: 1.8;
+}
+
+.connections {
+  width: 100%;
+  max-width: 700px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.groupTitle {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  font-weight: 600;
+  padding: 0 4px 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s, border-color 0.1s;
+  min-width: 0;
+  width: 100%;
+}
+.card:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+}
+.card:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.card.connecting {
+  border-color: var(--accent);
+  opacity: 0.7;
+}
+
+.cardIcon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.cardName {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+.cardMeta {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+.addBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
+}
+.addBtn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+  color: var(--text-primary);
+}

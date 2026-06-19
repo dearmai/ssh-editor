@@ -1,0 +1,82 @@
+.panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  overflow: hidden;
+}
+
+.serverHeader {
+  height: 35px;
+  display: flex;
+  align-items: center;
+  padding: 0 6px 0 10px;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--bg-tertiary);
+}
+
+.serverName {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.serverNameEmpty {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.sessionSelect {
+  height: 22px;
+  padding: 0 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  max-width: 100px;
+}
+
+.iconBtn {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  color: var(--text-muted);
+  transition: background 0.1s, color 0.1s;
+}
+.iconBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.iconBtn.danger:hover {
+  background: rgba(244, 135, 113, 0.15);
+  color: #f48771;
+}
+
+.content {
+  flex: 1;
+  overflow: hidden;
+}

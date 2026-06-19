@@ -1,0 +1,35 @@
+# ── Node / 프론트엔드 ──────────────────────────
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# ── 빌드 산출물 ────────────────────────────────
+build/
+
+# ── Rust / Tauri ───────────────────────────────
+src-tauri/target/
+src-tauri/gen/schemas/
+
+# ── 로그 ───────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ── 에디터 / OS ────────────────────────────────
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ── 환경 변수 / 비밀 ───────────────────────────
+.env
+.env.*
+!.env.example

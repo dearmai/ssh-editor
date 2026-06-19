@@ -1,0 +1,45 @@
+[package]
+name = "ssh-editor"
+version = "0.1.0"
+description = "SSH Remote File Editor"
+authors = ["rinjae"]
+edition = "2021"
+
+[lib]
+name = "ssh_editor_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri              = { version = "2", features = [] }
+tauri-plugin-store = { version = "2" }
+
+# SSH 백엔드
+russh        = { version = "0.61" }
+russh-sftp   = { version = "2.3" }
+russh-keys   = { version = "0.50.0-beta.7" }
+ssh-key      = { version = "=0.7.0-rc.10" }
+
+# 비동기 런타임
+tokio        = { version = "1", features = ["full"] }
+
+# 직렬화
+serde        = { version = "1", features = ["derive"] }
+serde_json   = { version = "1" }
+
+# 유틸리티
+uuid         = { version = "1", features = ["v4"] }
+thiserror    = { version = "2" }
+dashmap      = { version = "6" }
+dirs         = { version = "6" }
+base64       = { version = "0.22" }
+log          = { version = "0.4" }
+async-trait  = { version = "0.1" }
+regex        = { version = "1" }
+once_cell    = { version = "1" }
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

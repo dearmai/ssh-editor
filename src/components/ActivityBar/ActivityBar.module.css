@@ -1,0 +1,45 @@
+.bar {
+  width: 48px;
+  background: var(--activity-bar-bg);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+}
+
+.top, .bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--activity-bar-fg);
+  transition: color 0.15s;
+  opacity: 0.8;
+}
+
+.icon:hover:not(:disabled) {
+  color: var(--activity-bar-active);
+  opacity: 1;
+}
+
+.icon:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.active {
+  color: var(--activity-bar-active);
+  opacity: 1;
+}
