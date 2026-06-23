@@ -33,3 +33,6 @@ pnpm-debug.log*
 .env
 .env.*
 !.env.example
+
+# ── 로컬 문서 / 회고록 (커밋 제외) ─────────────
+docs/
