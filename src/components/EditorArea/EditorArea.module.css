@@ -14,12 +14,74 @@
   position: relative;
 }
 
-.pane.dropTarget::after {
+.emptyPane {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* 활성(포커스) 패널 = 파일 오픈 대상. 상단 액센트 스트립 + 은은한 외곽선 */
+.paneActive::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(0, 122, 204, 0.12);
+  border: 1px solid var(--accent);
+  pointer-events: none;
+  z-index: 7;
+  opacity: 0.55;
+}
+.activeStrip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+  z-index: 8;
+  pointer-events: none;
+}
+
+/* 드롭 위치 표시 (가운데=이동, 가장자리=해당 방향 분할). 탭 바(35px) 아래부터. 클릭 통과 */
+.dropZone {
+  position: absolute;
+  background: rgba(0, 122, 204, 0.18);
   border: 2px dashed var(--accent);
   pointer-events: none;
-  z-index: 5;
+  z-index: 6;
+  transition: all 0.08s ease;
+}
+.zone_center {
+  top: 35px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+.zone_right {
+  top: 35px;
+  bottom: 0;
+  right: 0;
+  left: 55%;
+}
+.zone_left {
+  top: 35px;
+  bottom: 0;
+  left: 0;
+  right: 55%;
+}
+.zone_bottom {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: 60%;
+}
+.zone_top {
+  left: 0;
+  right: 0;
+  top: 35px;
+  bottom: 55%;
 }

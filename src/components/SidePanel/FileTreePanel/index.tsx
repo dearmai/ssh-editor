@@ -23,15 +23,27 @@ import { useEffect, useState } from 'react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useConnectionStore } from '../../../stores/connectionStore';
+import { confirm } from '../../../stores/confirmStore';
 import { useEditorStore } from '../../../stores/editorStore';
 import { useFileTreeStore } from '../../../stores/fileTreeStore';
 import { useTransferStore } from '../../../stores/transferStore';
 import type { ConnectionProfile, FileEntry } from '../../../types';
 import styles from './FileTreePanel.module.css';
 
+/** 디렉토리 경로와 이름을 합쳐 절대 경로 생성 (루트 '/' 중복 슬래시 방지) */
+function joinPath(dir: string, name: string): string {
+  return dir.endsWith('/') ? `${dir}${name}` : `${dir}/${name}`;
+}
+
+/** 경로의 부모 디렉토리 */
+function parentDir(path: string): string {
+  return path.split('/').slice(0, -1).join('/') || '/';
+}
+
 export default function FileTreePanel() {
   const { selectedSessionId, activeConnections, saveActiveDirectories } = useConnectionStore();
-  const { rootPaths, loadDir, setRootPath } = useFileTreeStore();
+  const { rootPaths, loadDir, setRootPath, createFile, createDir, refreshConnection } =
+    useFileTreeStore();
   const [editingPath, setEditingPath] = useState(false);
 
   const conn = activeConnections.find((c) => c.sessionId === selectedSessionId);
@@ -49,6 +61,9 @@ export default function FileTreePanel() {
     setRootPath(selectedSessionId, p);
     await loadDir(selectedSessionId, p);
   };
+
+  // 새로 고침: 캐시를 무효화하고 열려있는 디렉토리들을 다시 로드 (loadDir는 캐시가 있으면 그대로 반환하므로 필요)
+  const refreshTree = () => refreshConnection(selectedSessionId);
 
   const addCurrentAsBase = () => {
     if (dirs.includes(rootPath)) return;
@@ -129,17 +144,54 @@ export default function FileTreePanel() {
         >
           <Upload size={13} />
         </button>
-        <button
-          className={styles.iconBtn}
-          title="새로 고침"
-          onClick={() => handlePathChange(rootPath)}
-        >
+        <button className={styles.iconBtn} title="새로 고침" onClick={refreshTree}>
           <RefreshCw size={13} />
         </button>
       </div>
-      <div className={styles.tree}>
-        <FileTreeNode connectionId={selectedSessionId} path={rootPath} isRoot />
-      </div>
+      <ContextMenu.Root>
+        <ContextMenu.Trigger asChild>
+          <div className={styles.tree}>
+            <FileTreeNode connectionId={selectedSessionId} path={rootPath} isRoot />
+          </div>
+        </ContextMenu.Trigger>
+        <ContextMenu.Portal>
+          <ContextMenu.Content className={styles.contextMenu}>
+            <div className={styles.contextHeader} title={rootPath}>
+              {rootPath}
+            </div>
+            <ContextMenu.Item
+              className={styles.contextItem}
+              onSelect={() => {
+                const name = prompt('새 파일 이름:');
+                if (name) createFile(selectedSessionId, joinPath(rootPath, name));
+              }}
+            >
+              <FilePlus size={12} /> 새 파일
+            </ContextMenu.Item>
+            <ContextMenu.Item
+              className={styles.contextItem}
+              onSelect={() => {
+                const name = prompt('새 폴더 이름:');
+                if (name) createDir(selectedSessionId, joinPath(rootPath, name));
+              }}
+            >
+              <FolderPlus size={12} /> 새 폴더
+            </ContextMenu.Item>
+            <ContextMenu.Separator className={styles.separator} />
+            <ContextMenu.Item
+              className={styles.contextItem}
+              onSelect={() =>
+                useTransferStore.getState().uploadFiles(selectedSessionId, rootPath)
+              }
+            >
+              <Upload size={12} /> 파일 업로드
+            </ContextMenu.Item>
+            <ContextMenu.Item className={styles.contextItem} onSelect={refreshTree}>
+              <RefreshCw size={12} /> 새로 고침
+            </ContextMenu.Item>
+          </ContextMenu.Content>
+        </ContextMenu.Portal>
+      </ContextMenu.Root>
     </div>
   );
 }
@@ -154,9 +206,9 @@ function EmptyServerList() {
     setConnecting(profile.id);
     setError(null);
     try {
-      const sessionId = await connect(profile);
       const rootPath =
         startPath ?? profile.directories?.[0] ?? profile.lastPath ?? `/home/${profile.username || 'root'}`;
+      const sessionId = await connect(profile, rootPath);
       setRootPath(sessionId, rootPath);
       await loadDir(sessionId, rootPath);
     } catch (e) {
@@ -313,27 +365,45 @@ function FileTreeNode({
 
   return (
     <div>
-      {children.map((entry) => (
-        <FileTreeItem
-          key={entry.path}
-          entry={entry}
-          connectionId={connectionId}
-          depth={depth}
-          onOpen={() => !entry.isDir && openFile(connectionId, entry)}
-          onToggle={async () => {
-            if (entry.isDir) {
-              if (!isExpanded(connectionId, entry.path)) {
-                await loadDir(connectionId, entry.path);
+      {children.map((entry) => {
+        // 파일이면 같은 폴더(부모)에, 디렉토리면 그 안에 생성
+        const targetDir = entry.isDir ? entry.path : parentDir(entry.path);
+        return (
+          <FileTreeItem
+            key={entry.path}
+            entry={entry}
+            connectionId={connectionId}
+            depth={depth}
+            onOpen={() => !entry.isDir && openFile(connectionId, entry)}
+            onToggle={async () => {
+              if (entry.isDir) {
+                if (!isExpanded(connectionId, entry.path)) {
+                  await loadDir(connectionId, entry.path);
+                }
+                toggleExpand(connectionId, entry.path);
               }
-              toggleExpand(connectionId, entry.path);
-            }
-          }}
-          onRefresh={() => refreshDir(connectionId, entry.path)}
-          onCreateFile={async (name) => createFile(connectionId, `${entry.path}/${name}`)}
-          onCreateDir={async (name) => createDir(connectionId, `${entry.path}/${name}`)}
-          onDelete={() => deletePath(connectionId, entry.path)}
-        />
-      ))}
+            }}
+            onRefresh={() => refreshDir(connectionId, entry.path)}
+            onCreateFile={async (name) => createFile(connectionId, joinPath(targetDir, name))}
+            onCreateDir={async (name) => createDir(connectionId, joinPath(targetDir, name))}
+            onDelete={async () => {
+              const ok = await confirm({
+                title: '삭제 확인',
+                message: (
+                  <>
+                    <strong>{entry.name}</strong>
+                    {entry.isDir ? ' 폴더와 그 안의 모든 항목을' : ' 파일을'} 삭제할까요?
+                    <br />이 작업은 되돌릴 수 없습니다.
+                  </>
+                ),
+                confirmLabel: '삭제',
+                danger: true,
+              });
+              if (ok) deletePath(connectionId, entry.path);
+            }}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -359,11 +429,13 @@ function FileTreeItem({
   onCreateDir: (name: string) => Promise<void>;
   onDelete: () => void;
 }) {
-  const { isExpanded, isLoading } = useFileTreeStore();
+  const { isExpanded, isLoading, isSelected, setSelected } = useFileTreeStore();
   const expanded = isExpanded(connectionId, entry.path);
   const loading = isLoading(connectionId, entry.path);
+  const selected = isSelected(connectionId, entry.path);
 
   const handleClick = () => {
+    setSelected(connectionId, entry.path);
     if (entry.isDir) {
       onToggle();
     } else {
@@ -372,11 +444,17 @@ function FileTreeItem({
   };
 
   return (
-    <ContextMenu.Root>
+    <ContextMenu.Root
+      onOpenChange={(open) => {
+        // 우클릭으로 메뉴가 열릴 때도 해당 항목을 선택 표시
+        if (open) setSelected(connectionId, entry.path);
+      }}
+    >
       <ContextMenu.Trigger asChild>
-        <div>
+        {/* stopPropagation: 상위(루트) 컨텍스트 메뉴가 동시에 열리는 것을 방지 */}
+        <div onContextMenu={(e) => e.stopPropagation()}>
           <div
-            className={styles.item}
+            className={`${styles.item} ${selected ? styles.selected : ''}`}
             style={{ paddingLeft: depth * 12 + 4 }}
             onClick={handleClick}
           >
@@ -412,32 +490,31 @@ function FileTreeItem({
 
       <ContextMenu.Portal>
         <ContextMenu.Content className={styles.contextMenu}>
+          {/* 새 파일/폴더 — 디렉토리면 그 안에, 파일이면 같은 폴더에 생성 */}
+          <ContextMenu.Item
+            className={styles.contextItem}
+            onSelect={() => {
+              const name = prompt('새 파일 이름:');
+              if (name) onCreateFile(name);
+            }}
+          >
+            <FilePlus size={12} /> 새 파일
+          </ContextMenu.Item>
+          <ContextMenu.Item
+            className={styles.contextItem}
+            onSelect={() => {
+              const name = prompt('새 폴더 이름:');
+              if (name) onCreateDir(name);
+            }}
+          >
+            <FolderPlus size={12} /> 새 폴더
+          </ContextMenu.Item>
           {entry.isDir && (
-            <>
-              <ContextMenu.Item
-                className={styles.contextItem}
-                onSelect={() => {
-                  const name = prompt('파일 이름:');
-                  if (name) onCreateFile(name);
-                }}
-              >
-                <FilePlus size={12} /> 새 파일
-              </ContextMenu.Item>
-              <ContextMenu.Item
-                className={styles.contextItem}
-                onSelect={() => {
-                  const name = prompt('폴더 이름:');
-                  if (name) onCreateDir(name);
-                }}
-              >
-                <FolderPlus size={12} /> 새 폴더
-              </ContextMenu.Item>
-              <ContextMenu.Item className={styles.contextItem} onSelect={onRefresh}>
-                <RefreshCw size={12} /> 새로 고침
-              </ContextMenu.Item>
-              <ContextMenu.Separator className={styles.separator} />
-            </>
+            <ContextMenu.Item className={styles.contextItem} onSelect={onRefresh}>
+              <RefreshCw size={12} /> 새로 고침
+            </ContextMenu.Item>
           )}
+          <ContextMenu.Separator className={styles.separator} />
 
           {/* 다운로드 */}
           {entry.isDir ? (

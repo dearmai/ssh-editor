@@ -27,6 +27,8 @@ export interface Settings {
   darkTheme: string;
   /** 라이트 모드일 때 사용할 색상 테마 id */
   lightTheme: string;
+  /** Monaco 미니맵(코드 미리보기) 표시 여부 */
+  minimapEnabled: boolean;
 }
 
 interface SettingsStore extends Settings {
@@ -48,6 +50,7 @@ const DEFAULTS: Settings = {
   themeOverrides: {},
   darkTheme: 'vscode-dark',
   lightTheme: 'vscode-light',
+  minimapEnabled: true,
 };
 
 export const useSettingsStore = create<SettingsStore>()(

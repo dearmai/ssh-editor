@@ -76,8 +76,8 @@ export default function NewConnectionDialog({ open, onClose }: Props) {
       if (form.saveProfile) {
         await addProfile(profile);
       }
-      const sessionId = await connect(profile);
       const rootPath = dirs[0] ?? `/home/${profile.username || 'root'}`;
+      const sessionId = await connect(profile, rootPath);
       setRootPath(sessionId, rootPath);
       await loadDir(sessionId, rootPath);
       onClose();

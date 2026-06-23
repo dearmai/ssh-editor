@@ -82,6 +82,13 @@
 .item:hover {
   background: var(--bg-hover);
 }
+.item.selected {
+  background: var(--bg-active);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.item.selected:hover {
+  background: var(--bg-active);
+}
 
 .chevron {
   width: 16px;
@@ -263,6 +270,19 @@
   height: 1px;
   background: var(--border);
   margin: 4px 0;
+}
+
+/* 루트 컨텍스트 메뉴 상단의 현재 경로 표시 */
+.contextHeader {
+  font-size: 10px;
+  color: var(--text-muted);
+  padding: 4px 10px 5px;
+  max-width: 280px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
 }
 
 /* 디렉토리 전환 메뉴 */

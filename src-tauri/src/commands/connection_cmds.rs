@@ -1,6 +1,6 @@
 use crate::config::{parse_ssh_config, ConnectionProfile, SshConfigHost};
 use crate::error::{AppError, AppResult};
-use crate::ssh::{ping_server, ssh_connect_inner, PingInfo, SshConnectionPool};
+use crate::ssh::{ping_server, reconnect_session, ssh_connect_inner, PingInfo, SshConnectionPool};
 use serde::{Deserialize, Serialize};
 use tauri::{State, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_store::StoreExt;
@@ -58,6 +58,34 @@ pub async fn ssh_ping(
     ping_server(&session).await
 }
 
+/// 세션 생존 여부 점검. 5초 내 ping이 성공하면 true, 아니면(끊김/타임아웃/세션 없음) false.
+/// 창 복귀 시 연결 끊김을 빠르게 감지하기 위한 용도.
+#[tauri::command]
+pub async fn ssh_health_check(
+    session_id: String,
+    pool: State<'_, SshConnectionPool>,
+) -> AppResult<bool> {
+    let session = match pool.sessions.get(&session_id) {
+        Some(s) => s.value().clone(),
+        None => return Ok(false),
+    };
+    let alive = matches!(
+        tokio::time::timeout(std::time::Duration::from_secs(5), ping_server(&session)).await,
+        Ok(Ok(_))
+    );
+    Ok(alive)
+}
+
+/// 동일한 sessionId를 유지한 채 재접속한다 (핸들/SFTP 교체).
+#[tauri::command]
+pub async fn ssh_reconnect(
+    session_id: String,
+    pool: State<'_, SshConnectionPool>,
+) -> AppResult<()> {
+    let session = pool.get(&session_id)?;
+    reconnect_session(&session).await
+}
+
 #[tauri::command]
 pub async fn open_new_window(app: tauri::AppHandle) -> AppResult<()> {
     let label = format!("win-{}", uuid::Uuid::new_v4());
@@ -65,6 +93,8 @@ pub async fn open_new_window(app: tauri::AppHandle) -> AppResult<()> {
         .title("SSH Editor")
         .inner_size(1400.0, 900.0)
         .min_inner_size(960.0, 640.0)
+        // HTML5 드래그앤드롭(탭 이동/분할)이 동작하도록 네이티브 drag-drop 핸들러 비활성화
+        .disable_drag_drop_handler()
         .build()
         .map_err(|e| AppError::Other(format!("새 창 생성 실패: {}", e)))?;
     Ok(())

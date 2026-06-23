@@ -72,7 +72,17 @@ pub struct PingInfo {
 }
 
 /// SSH exec로 `date`를 실행해 서버 시각과 왕복 지연(ping)을 측정한다.
+/// 끊긴 연결에서 핸들 락이 영원히 잡히는 것을 막기 위해 내부 타임아웃을 둔다.
 pub async fn ping_server(session: &SshSession) -> AppResult<PingInfo> {
+    tokio::time::timeout(
+        std::time::Duration::from_secs(8),
+        ping_server_inner(session),
+    )
+    .await
+    .map_err(|_| AppError::Other("ping 시간 초과 (8초)".to_string()))?
+}
+
+async fn ping_server_inner(session: &SshSession) -> AppResult<PingInfo> {
     use russh::ChannelMsg;
 
     let start = std::time::Instant::now();
@@ -166,7 +176,28 @@ pub async fn ssh_connect_inner(profile: ConnectionProfile) -> AppResult<Arc<SshS
 }
 
 async fn ssh_connect_impl(profile: ConnectionProfile) -> AppResult<Arc<SshSession>> {
-    let config = Arc::new(client::Config::default());
+    let (handle, sftp) = establish(&profile).await?;
+    let id = uuid::Uuid::new_v4().to_string();
+    let session = Arc::new(SshSession {
+        id,
+        profile,
+        handle: Mutex::new(handle),
+        sftp: Mutex::new(Some(sftp)),
+    });
+    Ok(session)
+}
+
+/// 프로필로 새 SSH 핸들과 SFTP 세션을 생성한다 (인증 + SFTP 서브시스템 초기화).
+/// 최초 접속과 재접속에서 공통으로 사용한다.
+async fn establish(
+    profile: &ConnectionProfile,
+) -> AppResult<(client::Handle<SshClientHandler>, SftpSession)> {
+    let mut config = client::Config::default();
+    // 유휴 연결(서버 다운/슬립 후 복귀 등)을 능동적으로 감지하기 위한 keepalive.
+    // 응답 없는 keepalive가 누적되면 러스시 이벤트 루프가 종료되어 채널 작업이 빠르게 실패한다.
+    config.keepalive_interval = Some(std::time::Duration::from_secs(15));
+    config.keepalive_max = 3;
+    let config = Arc::new(config);
     let handler = SshClientHandler;
 
     let addr = format!("{}:{}", profile.hostname, profile.port);
@@ -234,13 +265,20 @@ async fn ssh_connect_impl(profile: ConnectionProfile) -> AppResult<Arc<SshSessio
     sftp_channel.request_subsystem(true, "sftp").await?;
     let sftp = SftpSession::new(sftp_channel.into_stream()).await?;
 
-    let id = uuid::Uuid::new_v4().to_string();
-    let session = Arc::new(SshSession {
-        id: id.clone(),
-        profile,
-        handle: Mutex::new(handle),
-        sftp: Mutex::new(Some(sftp)),
-    });
+    Ok((handle, sftp))
+}
 
-    Ok(session)
+/// 기존 세션을 동일한 sessionId로 재접속한다 (핸들/SFTP를 새 연결로 교체).
+/// sessionId가 그대로이므로 에디터 탭·파일트리 등 프론트의 connectionId 참조가 유지된다.
+pub async fn reconnect_session(session: &SshSession) -> AppResult<()> {
+    let (handle, sftp) = tokio::time::timeout(
+        std::time::Duration::from_secs(20),
+        establish(&session.profile),
+    )
+    .await
+    .map_err(|_| AppError::Other("재접속 시간 초과 (20초)".to_string()))??;
+
+    *session.handle.lock().await = handle;
+    *session.sftp.lock().await = Some(sftp);
+    Ok(())
 }

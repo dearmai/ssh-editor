@@ -4,6 +4,7 @@
   "windows": ["main", "win-*"],
   "permissions": [
     "core:default",
+    "core:window:allow-close",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "core:event:allow-emit",

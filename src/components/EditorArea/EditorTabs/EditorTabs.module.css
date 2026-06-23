@@ -53,6 +53,14 @@
   border-top: 1px solid var(--tab-active-border);
 }
 
+/* 드래그 드롭 삽입 위치 표시 */
+.tab.dropBefore {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.tab.dropAfter {
+  box-shadow: inset -2px 0 0 var(--accent);
+}
+
 .dirty {
   width: 6px;
   height: 6px;
@@ -65,6 +73,17 @@
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* 동일 파일명 구분용 상위 경로 (흐리게) */
+.dirHint {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--text-muted);
 }
 
 .close {
@@ -106,4 +125,40 @@
 .actionBtn:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
+}
+
+/* 탭 우클릭 컨텍스트 메뉴 */
+.ctxMenu {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px;
+  min-width: 180px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  z-index: 100;
+}
+.ctxItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  font-size: 12px;
+  color: var(--text-primary);
+  border-radius: 3px;
+  cursor: pointer;
+  outline: none;
+}
+.ctxItem:hover,
+.ctxItem[data-highlighted] {
+  background: var(--accent);
+  color: white;
+}
+.ctxDisabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.ctxSeparator {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
 }

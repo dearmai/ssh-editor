@@ -21,6 +21,14 @@ export const sshDisconnect = (sessionId: string) =>
 export const sshPing = (sessionId: string) =>
   invoke<PingInfo>('ssh_ping', { sessionId });
 
+/** 세션 생존 여부 점검 (5초 내 ping 성공 시 true) */
+export const sshHealthCheck = (sessionId: string) =>
+  invoke<boolean>('ssh_health_check', { sessionId });
+
+/** 동일한 sessionId를 유지한 채 재접속 */
+export const sshReconnect = (sessionId: string) =>
+  invoke<void>('ssh_reconnect', { sessionId });
+
 export const openNewWindow = () =>
   invoke<void>('open_new_window');
 

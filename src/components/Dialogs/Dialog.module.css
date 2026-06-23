@@ -160,6 +160,32 @@
   cursor: not-allowed;
 }
 
+/* 위험 동작(삭제 등) 확인 버튼 */
+.dangerBtn {
+  background: #c4554d;
+}
+.dangerBtn:hover:not(:disabled) {
+  background: #d35a51;
+}
+
+/* 재접속 진행 중 표시 */
+.reconnectingRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 2px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.spin {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* .ssh/config 가져오기 */
 .importSection {
   border-bottom: 1px solid var(--border);

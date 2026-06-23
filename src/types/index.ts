@@ -70,6 +70,8 @@ export interface EditorTab {
   /** 마지막으로 읽거나 저장한 시점의 원격 파일 mtime/size (외부 변경 감지용) */
   baseMtime?: number;
   baseSize?: number;
+  /** 사용자가 이미 "무시"한 외부 변경의 mtime (같은 변경을 반복해서 묻지 않기 위함) */
+  seenMtime?: number;
 }
 
 export interface TerminalSessionInfo {

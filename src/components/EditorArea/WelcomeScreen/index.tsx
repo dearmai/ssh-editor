@@ -75,10 +75,10 @@ export default function WelcomeScreen() {
     );
 
     try {
-      const sessionId = await connect(profile);
-      if (cancelledRef.current) return;
       const rootPath =
         startPath ?? profile.directories?.[0] ?? profile.lastPath ?? `/home/${profile.username || 'root'}`;
+      const sessionId = await connect(profile, rootPath);
+      if (cancelledRef.current) return;
       setRootPath(sessionId, rootPath);
       await loadDir(sessionId, rootPath);
     } catch (e) {

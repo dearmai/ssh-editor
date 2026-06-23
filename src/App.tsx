@@ -3,16 +3,21 @@ import 'allotment/dist/style.css';
 import { useEffect, useRef, useState } from 'react';
 import { Activity, AppWindow, Clock } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import BottomPanel from './components/BottomPanel';
 import EditorArea from './components/EditorArea';
 import SidePanel from './components/SidePanel';
 import SettingsDialog from './components/Dialogs/SettingsDialog';
 import SaveConflictDialog from './components/Dialogs/SaveConflictDialog';
 import OpenFileDialog from './components/Dialogs/OpenFileDialog';
+import ConfirmDialog from './components/Dialogs/ConfirmDialog';
+import ReconnectDialog from './components/Dialogs/ReconnectDialog';
+import ExternalChangeDialog from './components/Dialogs/ExternalChangeDialog';
 import ThemePicker from './components/ThemePicker';
 import { getStartupArgs, openNewWindow, sshPing } from './ipc/commands';
 import { onTransferProgress } from './ipc/events';
 import { useConnectionStore } from './stores/connectionStore';
+import { useEditorStore } from './stores/editorStore';
 import { useTransferStore } from './stores/transferStore';
 import { useFileTreeStore } from './stores/fileTreeStore';
 import {
@@ -59,6 +64,57 @@ export default function App() {
       unlistenTransfer.then((fn) => fn());
     };
   }, [loadAll]);
+
+  // 창 복귀(포커스/가시성 전환) 시 연결 생존 점검 → 끊김 감지/재접속 흐름
+  useEffect(() => {
+    let lastCheck = 0;
+    const maybeCheck = () => {
+      if (document.visibilityState === 'hidden') return;
+      const now = Date.now();
+      if (now - lastCheck < 3000) return; // 짧은 연속 포커스 전환 스로틀
+      lastCheck = now;
+      useConnectionStore.getState().checkConnections();
+      // 열린 파일의 서버 측 외부 변경도 함께 검사
+      useEditorStore.getState().checkVisibleExternalChanges();
+    };
+    window.addEventListener('focus', maybeCheck);
+    document.addEventListener('visibilitychange', maybeCheck);
+    // 네이티브 창 포커스 (웹 focus 이벤트가 누락되는 경우 대비)
+    let unlistenFocus: (() => void) | undefined;
+    getCurrentWindow()
+      .onFocusChanged(({ payload: focused }) => {
+        if (focused) maybeCheck();
+      })
+      .then((fn) => {
+        unlistenFocus = fn;
+      })
+      .catch(() => {});
+    return () => {
+      window.removeEventListener('focus', maybeCheck);
+      document.removeEventListener('visibilitychange', maybeCheck);
+      unlistenFocus?.();
+    };
+  }, []);
+
+  // Cmd/Ctrl+W: 활성 탭 닫기 → 열린 탭이 하나도 없으면 창 닫기
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'w') return;
+      e.preventDefault();
+      e.stopPropagation();
+      const st = useEditorStore.getState();
+      const g = st.groupsById[st.activeGroupId];
+      if (g && g.activeTabId) {
+        st.closeTab(g.id, g.activeTabId);
+        return;
+      }
+      const total = Object.values(st.groupsById).reduce((n, gr) => n + gr.tabIds.length, 0);
+      if (total === 0) getCurrentWindow().close().catch((err) => log.error(`창 닫기 실패: ${err}`));
+    };
+    // capture: Monaco 등 하위 핸들러보다 먼저 가로채기
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, []);
 
   // UI 폰트 적용
   useEffect(() => {
@@ -126,6 +182,9 @@ export default function App() {
       <SettingsDialog open={showSettings} onClose={() => setShowSettings(false)} />
       <SaveConflictDialog />
       <OpenFileDialog />
+      <ConfirmDialog />
+      <ReconnectDialog />
+      <ExternalChangeDialog />
     </div>
   );
 }
