@@ -1,47 +1,37 @@
-import { Moon, Plus, Sun, X } from 'lucide-react';
-import { useState } from 'react';
-import { useConnectionStore } from '../../stores/connectionStore';
-import { useSettingsStore } from '../../stores/settingsStore';
+import { useEffect, useState } from 'react';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { useTransferStore } from '../../stores/transferStore';
 import LogPane from './LogPane';
 import TransferPane from './TransferPane';
-import TerminalPane from './Terminal';
+import TerminalGrid from './TerminalGrid';
+import TerminalSidebar from './TerminalSidebar';
 import styles from './BottomPanel.module.css';
 
-type ActiveTab = { kind: 'log' } | { kind: 'transfer' } | { kind: 'terminal'; id: string };
+type ActiveTab = 'log' | 'transfer' | 'terminal';
 
 export default function BottomPanel() {
-  const { sessions, setActiveSession, closeSession, createSession, setTerminalTheme } =
-    useTerminalStore();
-  const { selectedSessionId } = useConnectionStore();
-  const resolvedTheme = useSettingsStore((s) => s.resolvedTheme);
+  const sessions = useTerminalStore((s) => s.sessions);
+  const setDraggingTerminal = useTerminalStore((s) => s.setDraggingTerminal);
   const activeTransfers = useTransferStore(
     (s) => s.transfers.filter((t) => t.status === 'active' || t.status === 'queued').length
   );
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>({ kind: 'log' });
+  const [activeTab, setActiveTab] = useState<ActiveTab>('log');
 
-  const handleNewTerminal = async () => {
-    if (!selectedSessionId) return;
-    const id = await createSession(selectedSessionId);
-    setActiveSession(id);
-    setActiveTab({ kind: 'terminal', id });
-  };
+  // 드래그가 끝나면(드롭/취소 무관) 드래그 상태를 확실히 해제
+  useEffect(() => {
+    const clear = () => setDraggingTerminal(null);
+    window.addEventListener('dragend', clear);
+    window.addEventListener('drop', clear);
+    return () => {
+      window.removeEventListener('dragend', clear);
+      window.removeEventListener('drop', clear);
+    };
+  }, [setDraggingTerminal]);
 
-  const handleCloseTerminal = (sessionId: string) => {
-    closeSession(sessionId);
-    if (activeTab.kind === 'terminal' && activeTab.id === sessionId) {
-      setActiveTab({ kind: 'log' });
-    }
-  };
-
-  const isLogActive = activeTab.kind === 'log';
-  const isTransferActive = activeTab.kind === 'transfer';
-
-  const activeTerminal =
-    activeTab.kind === 'terminal' ? sessions.find((s) => s.id === activeTab.id) : undefined;
-  const activeTerminalTheme = activeTerminal?.theme ?? resolvedTheme;
+  const isLogActive = activeTab === 'log';
+  const isTransferActive = activeTab === 'transfer';
+  const isTerminalActive = activeTab === 'terminal';
 
   return (
     <div className={styles.panel}>
@@ -49,63 +39,23 @@ export default function BottomPanel() {
         <div className={styles.tabs}>
           <button
             className={`${styles.tab} ${isLogActive ? styles.active : ''}`}
-            onClick={() => setActiveTab({ kind: 'log' })}
+            onClick={() => setActiveTab('log')}
           >
             로그
           </button>
           <button
             className={`${styles.tab} ${isTransferActive ? styles.active : ''}`}
-            onClick={() => setActiveTab({ kind: 'transfer' })}
+            onClick={() => setActiveTab('transfer')}
           >
             전송
             {activeTransfers > 0 && <span className={styles.badge}>{activeTransfers}</span>}
           </button>
-
-          {sessions.map((session) => {
-            const isActive = activeTab.kind === 'terminal' && activeTab.id === session.id;
-            return (
-              <button
-                key={session.id}
-                className={`${styles.tab} ${isActive ? styles.active : ''}`}
-                onClick={() => {
-                  setActiveSession(session.id);
-                  setActiveTab({ kind: 'terminal', id: session.id });
-                }}
-              >
-                {session.title}
-                <span
-                  className={styles.closeTab}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleCloseTerminal(session.id);
-                  }}
-                >
-                  <X size={11} />
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className={styles.actions}>
-          {activeTerminal && (
-            <button
-              className={styles.actionBtn}
-              onClick={() =>
-                setTerminalTheme(activeTerminal.id, activeTerminalTheme === 'light' ? 'dark' : 'light')
-              }
-              title="이 터미널 라이트/다크 전환"
-            >
-              {activeTerminalTheme === 'light' ? <Moon size={14} /> : <Sun size={14} />}
-            </button>
-          )}
           <button
-            className={styles.actionBtn}
-            onClick={handleNewTerminal}
-            title="새 터미널"
-            disabled={!selectedSessionId}
+            className={`${styles.tab} ${isTerminalActive ? styles.active : ''}`}
+            onClick={() => setActiveTab('terminal')}
           >
-            <Plus size={14} />
+            터미널
+            {sessions.length > 0 && <span className={styles.count}>{sessions.length}</span>}
           </button>
         </div>
       </div>
@@ -118,24 +68,14 @@ export default function BottomPanel() {
           <TransferPane />
         </div>
 
-        {sessions.map((session) => {
-          const isActive = activeTab.kind === 'terminal' && activeTab.id === session.id;
-          return (
-            <div
-              key={session.id}
-              className={styles.terminalWrapper}
-              style={{ display: isActive ? 'block' : 'none' }}
-            >
-              <TerminalPane sessionId={session.id} connectionId={session.connectionId} />
-            </div>
-          );
-        })}
-
-        {activeTab.kind === 'terminal' && sessions.length === 0 && (
-          <div className={styles.empty}>
-            <p>+ 버튼으로 터미널을 여세요</p>
+        {/* 터미널: 항상 마운트(xterm·scrollback 보존), 표시만 토글.
+            좌 = 분할 영역(TerminalGrid), 우 = 탭 사이드바(VSCode식) */}
+        <div className={styles.terminalView} style={{ display: isTerminalActive ? 'flex' : 'none' }}>
+          <div className={styles.terminalMain}>
+            <TerminalGrid active={isTerminalActive} />
           </div>
-        )}
+          <TerminalSidebar />
+        </div>
       </div>
     </div>
   );

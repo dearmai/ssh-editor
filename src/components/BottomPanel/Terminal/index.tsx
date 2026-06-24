@@ -13,9 +13,11 @@ import styles from './Terminal.module.css';
 interface Props {
   sessionId: string;
   connectionId: string;
+  /** 이 터미널이 현재 화면에 보이는지 (분할 열 + 터미널 탭 활성). 숨김→표시 전환 시 강제 재그리기 */
+  visible?: boolean;
 }
 
-export default function TerminalPane({ sessionId, connectionId: _connectionId }: Props) {
+export default function TerminalPane({ sessionId, connectionId: _connectionId, visible = true }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -98,6 +100,26 @@ export default function TerminalPane({ sessionId, connectionId: _connectionId }:
       term.dispose();
     };
   }, [sessionId]);
+
+  // 숨김(display:none)이던 터미널이 다시 보이게 될 때: xterm은 자동으로 다시 그리지 않으므로
+  // 레이아웃 반영 후(rAF) 강제로 fit + refresh. (분할로 새 열이 표시될 때 빈 화면 방지)
+  useEffect(() => {
+    if (!visible) return;
+    const raf = requestAnimationFrame(() => {
+      const term = termRef.current;
+      const fit = fitRef.current;
+      if (!term || !fit) return;
+      try {
+        fit.fit();
+        terminalResize(sessionId, term.cols, term.rows);
+        term.refresh(0, term.rows - 1);
+        term.scrollToBottom();
+      } catch {
+        /* 디스포즈 직후 등 — 무시 */
+      }
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [visible, sessionId]);
 
   return (
     <div

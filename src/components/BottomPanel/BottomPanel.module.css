@@ -40,6 +40,8 @@
 }
 .tab:hover { background: var(--bg-hover); color: var(--text-primary); }
 .tab.active { background: var(--bg-primary); color: var(--text-primary); }
+/* 분할에 함께 보이는(포커스는 아닌) 터미널 탭: 하단 액센트로 표시 */
+.tab.inSplit { color: var(--text-primary); box-shadow: inset 0 -2px 0 var(--accent); }
 
 .badge {
   display: inline-flex;
@@ -94,9 +96,36 @@
   position: relative;
 }
 
-.terminalWrapper {
+/* 터미널 뷰: 좌 분할 영역 + 우 탭 사이드바 */
+.terminalView {
   width: 100%;
   height: 100%;
+  flex-direction: row;
+}
+.terminalMain {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+}
+
+/* 터미널 탭의 세션 개수 배지 */
+.count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  margin-left: 6px;
+  border-radius: 8px;
+  background: var(--bg-active);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 600;
+}
+.tab.active .count {
+  background: var(--accent);
+  color: #fff;
 }
 
 .empty {

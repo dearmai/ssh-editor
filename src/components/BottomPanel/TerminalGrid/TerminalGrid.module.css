@@ -1,0 +1,102 @@
+.grid {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+}
+
+.col {
+  position: relative;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--border);
+}
+.col:last-child {
+  border-right: none;
+}
+
+/* 분할 시 활성 열 상단 액센트 라인 */
+.colActive::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+  z-index: 7;
+  pointer-events: none;
+}
+
+/* 두 열 경계의 리사이즈 거터 (열 왼쪽 가장자리에 겹침) */
+.gutter {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  margin-left: -3px;
+  cursor: col-resize;
+  z-index: 5;
+}
+.gutter:hover {
+  background: var(--accent);
+  opacity: 0.35;
+}
+
+/* 분할 시 각 칸 우상단 hover 분할-닫기 버튼 (캡션 바 없이 깔끔하게) */
+.unsplit {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 8;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  opacity: 0;
+}
+.col:hover .unsplit {
+  opacity: 0.85;
+}
+.unsplit:hover {
+  opacity: 1;
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.dropZone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  background: var(--accent);
+  opacity: 0.22;
+  pointer-events: none;
+  z-index: 6;
+}
+.zoneLeft {
+  left: 0;
+}
+.zoneRight {
+  right: 0;
+}
+
+.empty {
+  margin: auto;
+  color: var(--text-muted);
+  font-size: 12px;
+}

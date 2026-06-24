@@ -70,6 +70,8 @@ interface EditorStore {
   setActiveTab: (groupId: string, tabId: string) => void;
   setActiveGroup: (groupId: string) => void;
   updateContent: (tabId: string, content: string) => void;
+  /** 탭의 구문 강조 언어를 수동 변경 (상태바 언어 선택) */
+  setTabLanguage: (tabId: string, language: string) => void;
   saveTab: (tabId: string) => Promise<void>;
   resolveConflict: (mode: ConflictResolution) => Promise<void>;
   checkExternalChange: (tabId: string) => Promise<void>;
@@ -279,6 +281,13 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       const tab = s.tabsById[tabId];
       if (!tab) return {};
       return { tabsById: { ...s.tabsById, [tabId]: { ...tab, content, isDirty: true } } };
+    }),
+
+  setTabLanguage: (tabId, language) =>
+    set((s) => {
+      const tab = s.tabsById[tabId];
+      if (!tab || tab.language === language) return {};
+      return { tabsById: { ...s.tabsById, [tabId]: { ...tab, language } } };
     }),
 
   saveTab: async (tabId) => {

@@ -14,6 +14,7 @@ import ConfirmDialog from './components/Dialogs/ConfirmDialog';
 import ReconnectDialog from './components/Dialogs/ReconnectDialog';
 import ExternalChangeDialog from './components/Dialogs/ExternalChangeDialog';
 import ThemePicker from './components/ThemePicker';
+import LanguageStatus from './components/LanguageStatus';
 import { getStartupArgs, openNewWindow, sshPing } from './ipc/commands';
 import { onTransferProgress } from './ipc/events';
 import { useConnectionStore } from './stores/connectionStore';
@@ -166,6 +167,7 @@ export default function App() {
           <TransferStatus />
 
           <div className={styles.statusRight}>
+            <LanguageStatus />
             <button
               className={styles.statusBtn}
               onClick={() => openNewWindow().catch((e) => log.error(`새 창 열기 실패: ${e}`))}

@@ -1,0 +1,180 @@
+.sidebar {
+  flex: 0 0 190px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-tertiary);
+  border-left: 1px solid var(--border);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 28px;
+  padding: 0 4px 0 10px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.headTitle {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.headActions {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.iconBtn {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  color: var(--text-secondary);
+}
+.iconBtn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.iconBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.empty {
+  padding: 12px 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* 분할 그룹(=VSCode 탭): 여러 패널을 하나로 묶어 표시 */
+.group {
+  position: relative;
+}
+/* 활성 그룹(메인 영역에 보이는 그룹) 배경 강조 */
+.activeGroup {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+/* 2개 이상 분할된 그룹: 왼쪽 세로 연결선 (행 배경 위로 올려 hover 시 끊김 방지) */
+.splitGroup::before {
+  content: '';
+  position: absolute;
+  left: 15px;
+  top: 14px;
+  bottom: 14px;
+  width: 1.5px;
+  background: var(--border);
+  border-radius: 1px;
+  z-index: 1;
+  pointer-events: none;
+}
+.splitGroup.activeGroup::before {
+  background: var(--accent);
+}
+
+.row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 4px 0 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  border-left: 2px solid transparent;
+}
+.row:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+/* 분할 그룹에 속한 패널: 들여쓰기 + 가로 연결선 */
+.rowGrouped {
+  padding-left: 28px;
+}
+.rowGrouped::before {
+  content: '';
+  position: absolute;
+  left: 15px;
+  top: 50%;
+  width: 10px;
+  height: 1.5px;
+  background: var(--border);
+  z-index: 1;
+  pointer-events: none;
+}
+.splitGroup.activeGroup .rowGrouped::before {
+  background: var(--accent);
+}
+/* 포커스된 터미널 */
+.row.focused {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+/* 단독(비그룹) 행만 왼쪽 액센트 — 그룹 행은 연결선+배경으로 충분 */
+.row.focused:not(.rowGrouped) {
+  border-left-color: var(--accent);
+}
+
+/* 사이드바 내 드래그 재배치/그룹 이동 시 삽입 위치 표시 */
+.row.dropBefore::after,
+.row.dropAfter::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+  z-index: 3;
+  pointer-events: none;
+}
+.row.dropBefore::after {
+  top: -1px;
+}
+.row.dropAfter::after {
+  bottom: -1px;
+}
+
+.rowTitle {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowClose {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+  color: var(--text-secondary);
+  opacity: 0;
+  flex-shrink: 0;
+}
+.row:hover .rowClose {
+  opacity: 0.8;
+}
+.rowClose:hover {
+  background: var(--bg-active);
+  color: var(--text-primary);
+  opacity: 1;
+}
