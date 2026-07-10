@@ -37,6 +37,20 @@
   opacity: 0.9;
 }
 
+/* ping 값: 상태바 accent 배경 위에서도 대비 확보용 어두운 pill */
+.pingChip {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 8px;
+  padding: 1px 7px;
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.38);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 1;
+}
+
 .statusRight {
   margin-left: auto;
   display: flex;

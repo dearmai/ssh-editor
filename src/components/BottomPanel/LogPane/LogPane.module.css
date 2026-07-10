@@ -99,6 +99,8 @@
 .message {
   color: var(--text-secondary);
   word-break: break-word;
+  user-select: text;
+  -webkit-user-select: text;
 }
 .entry.error .message { color: #f48771; }
 .entry.warn .message { color: #dcdcaa; }

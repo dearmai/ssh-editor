@@ -62,6 +62,8 @@ cd src-tauri && cargo check   # Rust 타입 검증
 
 - UI 텍스트·주석·로그는 **한국어**.
 - 스타일은 **CSS Modules** + `globals.css`의 CSS 변수(`--bg-*`, `--text-*`, `--accent`, `--font-*`). 색을 하드코딩하지 말고 변수 사용(테마 전환 위해).
+- **텍스트 선택**: `#root`는 `user-select: none`(드래그 시 앱 크롬 전체가 네이티브 선택되는 것 방지). 선택 가능해야 하는 영역(에디터·터미널·로그)만 `user-select: text`로 opt-in.
+- 상태바 accent 배경 위 값은 대비 확보 필요 — ping은 반투명 검정 pill(`.pingChip`)로 표시.
 - 에러: Rust `AppError`가 String으로 Serialize → 프론트는 `catch (e) { String(e) }`.
 
 ## 검증

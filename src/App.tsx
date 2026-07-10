@@ -251,7 +251,7 @@ function ServerStatus({ sessionId }: { sessionId: string }) {
   const pad = (n: number) => String(n).padStart(2, '0');
   const clock = `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
   const pingColor =
-    info.pingMs < 80 ? '#4ec9b0' : info.pingMs < 200 ? '#dcdcaa' : '#f48771';
+    info.pingMs < 80 ? '#57e0c3' : info.pingMs < 200 ? '#f0e090' : '#ff9d85';
 
   return (
     <>
@@ -259,7 +259,7 @@ function ServerStatus({ sessionId }: { sessionId: string }) {
         <Clock size={11} style={{ verticalAlign: '-1px', marginRight: 4 }} />
         {clock}
       </span>
-      <span className={styles.statusItem} style={{ color: pingColor }} title="왕복 지연 (ping)">
+      <span className={styles.pingChip} style={{ color: pingColor }} title="왕복 지연 (ping)">
         <Activity size={11} style={{ verticalAlign: '-1px', marginRight: 4 }} />
         {info.pingMs}ms
       </span>

@@ -381,6 +381,28 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     if (tab.seenMtime != null && stat.mtime === tab.seenMtime) return;
     if (get().externalChange || get().conflict) return;
 
+    // 로컬 수정이 없으면 물어보지 않고 서버 버전으로 조용히 재로드
+    if (!tab.isDirty) {
+      const content = await sftpReadFile(tab.connectionId, tab.remotePath).catch(() => null);
+      if (content == null) return;
+      const fresh = await sftpStat(tab.connectionId, tab.remotePath).catch(() => null);
+      set((s) => ({
+        tabsById: {
+          ...s.tabsById,
+          [tabId]: {
+            ...s.tabsById[tabId],
+            content,
+            isDirty: false,
+            baseMtime: fresh?.mtime ?? stat.mtime,
+            baseSize: fresh?.size ?? stat.size,
+            seenMtime: undefined,
+          },
+        },
+      }));
+      log.info(`외부 변경 자동 재로드: ${tab.remotePath}`);
+      return;
+    }
+
     set({
       externalChange: {
         tabId,

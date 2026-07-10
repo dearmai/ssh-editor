@@ -68,6 +68,20 @@ html, body, #root {
   -webkit-font-smoothing: antialiased;
 }
 
+/* 드래그 시 앱 크롬 전체가 네이티브로 선택되는 것 방지.
+   텍스트 선택은 필요한 영역(에디터·터미널·로그)에서만 opt-in. */
+#root {
+  user-select: none;
+  -webkit-user-select: none;
+}
+.monaco-editor,
+.monaco-editor .view-lines,
+.xterm .xterm-screen,
+[data-selectable='true'] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 /* allotment 전역 오버라이드 */
 .allotment-module_splitView__L-yRc {
   height: 100%;
