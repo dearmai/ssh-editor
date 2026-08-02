@@ -51,7 +51,7 @@ env-check:
 env-setup:
 	@$(PS) scripts/setup-env.ps1
 
-setup:
+setup: install
 	@$(PS) scripts/install-app.ps1
 
 install:
@@ -83,7 +83,7 @@ env-check:
 env-setup:
 	@bash scripts/setup-env.sh
 
-setup:
+setup: install
 	@bash scripts/install-app.sh
 
 install:
