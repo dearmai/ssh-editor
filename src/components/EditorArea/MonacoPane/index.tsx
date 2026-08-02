@@ -73,7 +73,7 @@ export default function MonacoPane({ tabId }: Props) {
           dragAndDrop: false,
           dropIntoEditor: { enabled: false },
           minimap: { enabled: minimapEnabled, scale: 1 },
-          wordWrap: 'off',
+          wordWrap: tab.wordWrap ? 'on' : 'off',
           scrollBeyondLastLine: false,
           renderWhitespace: 'selection',
           bracketPairColorization: { enabled: true },

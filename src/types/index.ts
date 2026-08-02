@@ -72,6 +72,8 @@ export interface EditorTab {
   baseSize?: number;
   /** 사용자가 이미 "무시"한 외부 변경의 mtime (같은 변경을 반복해서 묻지 않기 위함) */
   seenMtime?: number;
+  /** 자동 줄바꿈 (파일별 설정, 기본 off) */
+  wordWrap?: boolean;
 }
 
 export interface TerminalSessionInfo {

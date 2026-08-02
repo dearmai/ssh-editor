@@ -1,7 +1,7 @@
 import { Allotment } from 'allotment';
 import 'allotment/dist/style.css';
 import { useEffect, useRef, useState } from 'react';
-import { Activity, AppWindow, Clock } from 'lucide-react';
+import { Activity, AppWindow, Clock, WrapText } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import BottomPanel from './components/BottomPanel';
@@ -117,6 +117,22 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown, true);
   }, []);
 
+  // Alt(Option)+Z: 활성 탭 자동 줄바꿈 토글
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      // macOS는 Option+Z가 'Ω'로 들어오므로 물리 키(code)로 판정
+      if (!e.altKey || e.metaKey || e.ctrlKey || e.code !== 'KeyZ') return;
+      const st = useEditorStore.getState();
+      const tabId = st.groupsById[st.activeGroupId]?.activeTabId;
+      if (!tabId) return;
+      e.preventDefault();
+      e.stopPropagation();
+      st.toggleWordWrap(tabId);
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, []);
+
   // UI 폰트 적용
   useEffect(() => {
     applyUiFont({ uiFontFamily, uiFontSize });
@@ -167,6 +183,7 @@ export default function App() {
           <TransferStatus />
 
           <div className={styles.statusRight}>
+            <WordWrapStatus />
             <LanguageStatus />
             <button
               className={styles.statusBtn}
@@ -188,6 +205,28 @@ export default function App() {
       <ReconnectDialog />
       <ExternalChangeDialog />
     </div>
+  );
+}
+
+/** 상태바의 자동 줄바꿈 표시/토글 (활성 에디터 탭 대상) */
+function WordWrapStatus() {
+  const activeTab = useEditorStore((s) => {
+    const id = s.groupsById[s.activeGroupId]?.activeTabId;
+    return id ? s.tabsById[id] : undefined;
+  });
+  const toggleWordWrap = useEditorStore((s) => s.toggleWordWrap);
+  if (!activeTab) return null;
+
+  const on = !!activeTab.wordWrap;
+  return (
+    <button
+      className={`${styles.statusBtn} ${on ? styles.active : ''}`}
+      onClick={() => toggleWordWrap(activeTab.id)}
+      title={`자동 줄바꿈 ${on ? '켜짐' : '꺼짐'} (⌥Z)`}
+    >
+      <WrapText size={12} />
+      줄바꿈 {on ? '켬' : '끔'}
+    </button>
   );
 }
 
