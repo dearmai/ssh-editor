@@ -117,20 +117,28 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown, true);
   }, []);
 
-  // Alt(Option)+Z: 활성 탭 자동 줄바꿈 토글
+  // Alt(Option)+Z: 활성 탭 자동 줄바꿈 토글 (메뉴 "보기 > 자동 줄바꿈" + 웹뷰 폴백)
   useEffect(() => {
+    const toggleActive = () => {
+      const st = useEditorStore.getState();
+      const tabId = st.groupsById[st.activeGroupId]?.activeTabId;
+      if (tabId) st.toggleWordWrap(tabId);
+    };
+    const unlistenMenu = listen('menu-toggle-word-wrap', toggleActive);
+
+    // 네이티브 메뉴가 단축키를 못 받는 경우(웹뷰 포커스 등) 대비
     const onKeyDown = (e: KeyboardEvent) => {
       // macOS는 Option+Z가 'Ω'로 들어오므로 물리 키(code)로 판정
       if (!e.altKey || e.metaKey || e.ctrlKey || e.code !== 'KeyZ') return;
-      const st = useEditorStore.getState();
-      const tabId = st.groupsById[st.activeGroupId]?.activeTabId;
-      if (!tabId) return;
       e.preventDefault();
       e.stopPropagation();
-      st.toggleWordWrap(tabId);
+      toggleActive();
     };
     window.addEventListener('keydown', onKeyDown, true);
-    return () => window.removeEventListener('keydown', onKeyDown, true);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, true);
+      unlistenMenu.then((fn) => fn());
+    };
   }, []);
 
   // UI 폰트 적용

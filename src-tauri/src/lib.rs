@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use ssh::{SshConnectionPool, TerminalPool};
 use std::sync::Mutex;
 use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
-use tauri::{Emitter, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -52,6 +52,10 @@ pub fn run(startup_args: Option<StartupArgs>) {
                 .quit()
                 .build()?;
 
+            let word_wrap_item = MenuItemBuilder::with_id("toggle-word-wrap", "자동 줄바꿈")
+                .accelerator("Alt+Z")
+                .build(app)?;
+
             let edit_menu = SubmenuBuilder::new(app, "편집")
                 .undo()
                 .redo()
@@ -69,9 +73,12 @@ pub fn run(startup_args: Option<StartupArgs>) {
                 .maximize()
                 .build()?;
 
+            let view_menu = SubmenuBuilder::new(app, "보기").item(&word_wrap_item).build()?;
+
             let menu = MenuBuilder::new(app)
                 .item(&app_menu)
                 .item(&edit_menu)
+                .item(&view_menu)
                 .item(&window_menu)
                 .build()?;
 
@@ -80,6 +87,17 @@ pub fn run(startup_args: Option<StartupArgs>) {
             app.on_menu_event(|app, event| match event.id().as_ref() {
                 "preferences" => {
                     app.emit("menu-preferences", ()).ok();
+                }
+                "toggle-word-wrap" => {
+                    // 전역 emit이면 모든 창이 토글되므로 포커스된 창에만 전달
+                    // (get_focused_window는 tauri "unstable" feature라 is_focused로 탐색)
+                    let focused = app
+                        .webview_windows()
+                        .into_values()
+                        .find(|w| w.is_focused().unwrap_or(false));
+                    if let Some(w) = focused {
+                        let _ = app.emit_to(w.label(), "menu-toggle-word-wrap", ());
+                    }
                 }
                 "new-window" => {
                     let label = format!("win-{}", uuid::Uuid::new_v4());
