@@ -113,6 +113,40 @@ pub async fn upload(
     Ok(())
 }
 
+/// 메모리 데이터 → 원격 업로드.
+/// 웹뷰에 드롭된 파일은 로컬 경로를 알 수 없어(WKWebView) 프론트가 bytes 로 전달한다.
+pub async fn upload_data(
+    app: &AppHandle,
+    session: &SshSession,
+    data: &[u8],
+    remote_path: &str,
+    id: &str,
+) -> AppResult<()> {
+    let total = data.len() as u64;
+
+    let sftp_guard = session.sftp.lock().await;
+    let sftp = sftp_guard
+        .as_ref()
+        .ok_or_else(|| AppError::Other("SFTP 세션이 없습니다".to_string()))?;
+    let mut remote = sftp.create(remote_path).await?;
+
+    let mut transferred = 0u64;
+    let mut last = Instant::now();
+    emit_progress(app, id, 0, total, "active", None);
+
+    for chunk in data.chunks(CHUNK) {
+        remote.write_all(chunk).await?;
+        transferred += chunk.len() as u64;
+        if last.elapsed().as_millis() >= EMIT_INTERVAL_MS {
+            emit_progress(app, id, transferred, total, "active", None);
+            last = Instant::now();
+        }
+    }
+    remote.flush().await?;
+    emit_progress(app, id, transferred, total, "done", None);
+    Ok(())
+}
+
 /// 원격 파일 → 로컬 다운로드
 pub async fn download_file(
     app: &AppHandle,

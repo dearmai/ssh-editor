@@ -19,15 +19,19 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type DragEvent } from 'react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { sftpCheckWriteAccess, sftpExists } from '../../../ipc/commands';
 import { useConnectionStore } from '../../../stores/connectionStore';
 import { confirm } from '../../../stores/confirmStore';
+import { log } from '../../../stores/logStore';
+import { promptText } from '../../../stores/promptStore';
 import { useEditorStore } from '../../../stores/editorStore';
 import { useFileTreeStore } from '../../../stores/fileTreeStore';
 import { useTransferStore } from '../../../stores/transferStore';
 import type { ConnectionProfile, FileEntry } from '../../../types';
+import NewConnectionDialog from '../../Dialogs/NewConnectionDialog';
 import styles from './FileTreePanel.module.css';
 
 /** 디렉토리 경로와 이름을 합쳐 절대 경로 생성 (루트 '/' 중복 슬래시 방지) */
@@ -40,9 +44,114 @@ function parentDir(path: string): string {
   return path.split('/').slice(0, -1).join('/') || '/';
 }
 
+/** 이 드래그를 트리가 받을 수 있는가 — 내부 트리 항목 또는 외부 파일(Finder 등)만 */
+function canAcceptTreeDrop(e: DragEvent, connectionId: string): boolean {
+  const { dragging } = useFileTreeStore.getState();
+  if (dragging?.connectionId === connectionId) return true;
+  return e.dataTransfer.types.includes('Files');
+}
+
+/** 내부 이동 시 대상 디렉토리가 유효한가 (제자리·자기 자신·자기 하위 제외) */
+function isValidMoveTarget(connectionId: string, targetDir: string): boolean {
+  const { dragging } = useFileTreeStore.getState();
+  if (!dragging || dragging.connectionId !== connectionId) return true; // 외부 파일 드롭은 항상 유효
+  const srcPath = dragging.entry.path;
+  if (targetDir === srcPath || targetDir === parentDir(srcPath)) return false;
+  if (dragging.entry.isDir && targetDir.startsWith(`${srcPath}/`)) return false;
+  return true;
+}
+
+/** 트리 드롭 공통 처리 — 외부 파일이면 업로드, 내부 항목이면 확인 후 이동 */
+async function handleTreeDrop(e: DragEvent, connectionId: string, targetDir: string) {
+  const { dragging, setDragging, setDropDir, movePath } = useFileTreeStore.getState();
+  setDropDir(null);
+
+  // 외부 파일 드롭 → 업로드. File 객체는 drop 이벤트 안에서만 유효하므로 동기로 수집.
+  // WKWebView 는 드롭 파일의 로컬 경로를 주지 않아 bytes 업로드 경로를 사용한다.
+  if (e.dataTransfer.files.length > 0) {
+    const files: File[] = [];
+    let skippedDirs = 0;
+    for (const item of Array.from(e.dataTransfer.items)) {
+      if (item.kind !== 'file') continue;
+      if (item.webkitGetAsEntry?.()?.isDirectory) {
+        skippedDirs++;
+        continue;
+      }
+      const f = item.getAsFile();
+      if (f) files.push(f);
+    }
+    if (skippedDirs > 0) {
+      log.warn(`폴더 ${skippedDirs}개 건너뜀 — 폴더 드롭 업로드는 지원하지 않습니다`);
+    }
+    if (files.length > 0) {
+      useTransferStore.getState().uploadDroppedFiles(connectionId, targetDir, files);
+    }
+    return;
+  }
+
+  // 내부 항목 이동
+  if (!dragging || dragging.connectionId !== connectionId) return;
+  const valid = isValidMoveTarget(connectionId, targetDir); // dragging 이 지워지기 전에 판정
+  setDragging(null);
+  if (!valid) return;
+  const src = dragging.entry;
+  const srcParent = parentDir(src.path);
+
+  const ok = await confirm({
+    title: '이동 확인',
+    message: (
+      <>
+        <strong>{src.name}</strong> {src.isDir ? '폴더를' : '파일을'} 아래 위치로 이동할까요?
+        <br />
+        <strong>{targetDir}</strong>
+      </>
+    ),
+    confirmLabel: '이동',
+  });
+  if (!ok) return;
+
+  // 사전 점검 ① 이름 충돌 — SFTP rename 은 대상이 있으면 실패하므로 미리 안내
+  const destPath = joinPath(targetDir, src.name);
+  if (await sftpExists(connectionId, destPath).catch(() => false)) {
+    log.error(`이동 불가: ${destPath} 가 이미 존재합니다`);
+    await confirm({
+      title: '이동 불가',
+      message: `대상에 같은 이름이 이미 존재합니다: ${destPath}`,
+      confirmLabel: '확인',
+    });
+    return;
+  }
+  // 사전 점검 ② 권한 — 원본 부모(항목 제거)·대상(항목 추가) 모두 쓰기 필요
+  try {
+    const [destOk, srcOk] = await Promise.all([
+      sftpCheckWriteAccess(connectionId, targetDir),
+      sftpCheckWriteAccess(connectionId, srcParent),
+    ]);
+    if (!destOk || !srcOk) {
+      const where = destOk ? srcParent : targetDir;
+      log.error(`이동 불가: ${where} 에 쓰기 권한이 없습니다`);
+      await confirm({
+        title: '이동 불가',
+        message: `쓰기 권한이 없습니다: ${where}`,
+        confirmLabel: '확인',
+      });
+      return;
+    }
+  } catch (err) {
+    log.warn(`권한 사전 점검 실패, 이동 계속 시도: ${err}`);
+  }
+
+  try {
+    await movePath(connectionId, src.path, targetDir);
+    log.info(`이동: ${src.path} → ${destPath}`);
+  } catch (err) {
+    log.error(`이동 실패: ${src.name} — ${err}`);
+  }
+}
+
 export default function FileTreePanel() {
   const { selectedSessionId, activeConnections, saveActiveDirectories } = useConnectionStore();
-  const { rootPaths, loadDir, setRootPath, createFile, createDir, refreshConnection } =
+  const { rootPaths, loadDir, setRootPath, createFile, createDir, refreshConnection, dropDir, setDropDir } =
     useFileTreeStore();
   const [editingPath, setEditingPath] = useState(false);
 
@@ -150,7 +259,26 @@ export default function FileTreePanel() {
       </div>
       <ContextMenu.Root>
         <ContextMenu.Trigger asChild>
-          <div className={styles.tree}>
+          <div
+            className={`${styles.tree} ${dropDir === rootPath ? styles.treeDropActive : ''}`}
+            onDragOver={(e) => {
+              if (!canAcceptTreeDrop(e, selectedSessionId)) return;
+              if (!isValidMoveTarget(selectedSessionId, rootPath)) {
+                setDropDir(null);
+                return;
+              }
+              e.preventDefault();
+              setDropDir(rootPath);
+            }}
+            onDragLeave={(e) => {
+              // 자식 요소로의 이동은 무시, 트리 밖으로 나갈 때만 하이라이트 해제
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropDir(null);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              handleTreeDrop(e, selectedSessionId, rootPath);
+            }}
+          >
             <FileTreeNode connectionId={selectedSessionId} path={rootPath} isRoot />
           </div>
         </ContextMenu.Trigger>
@@ -161,8 +289,8 @@ export default function FileTreePanel() {
             </div>
             <ContextMenu.Item
               className={styles.contextItem}
-              onSelect={() => {
-                const name = prompt('새 파일 이름:');
+              onSelect={async () => {
+                const name = await promptText({ title: '새 파일', placeholder: '파일 이름' });
                 if (name) createFile(selectedSessionId, joinPath(rootPath, name));
               }}
             >
@@ -170,8 +298,8 @@ export default function FileTreePanel() {
             </ContextMenu.Item>
             <ContextMenu.Item
               className={styles.contextItem}
-              onSelect={() => {
-                const name = prompt('새 폴더 이름:');
+              onSelect={async () => {
+                const name = await promptText({ title: '새 폴더', placeholder: '폴더 이름' });
                 if (name) createDir(selectedSessionId, joinPath(rootPath, name));
               }}
             >
@@ -197,10 +325,25 @@ export default function FileTreePanel() {
 }
 
 function EmptyServerList() {
-  const { profiles, connect } = useConnectionStore();
+  const { profiles, connect, removeProfile } = useConnectionStore();
   const { setRootPath, loadDir } = useFileTreeStore();
   const [connecting, setConnecting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [editTarget, setEditTarget] = useState<ConnectionProfile | null>(null);
+
+  const handleDelete = async (p: ConnectionProfile) => {
+    const ok = await confirm({
+      title: '서버 삭제',
+      message: (
+        <>
+          <strong>{p.name}</strong> 서버를 목록에서 삭제할까요?
+        </>
+      ),
+      confirmLabel: '삭제',
+      danger: true,
+    });
+    if (ok) removeProfile(p.id);
+  };
 
   const handleConnect = async (profile: ConnectionProfile, startPath?: string) => {
     setConnecting(profile.id);
@@ -239,20 +382,38 @@ function EmptyServerList() {
         const dirs = p.directories ?? [];
         return (
           <div key={p.id} className={styles.serverGroup}>
-            <button
-              className={styles.serverItem}
-              onClick={() => handleConnect(p)}
-              disabled={!!connecting}
-              title={`${p.username}@${p.hostname}`}
-            >
-              {connecting === p.id ? (
-                <Loader2 size={13} className={styles.spin} />
-              ) : (
-                <Server size={13} />
-              )}
-              <span className={styles.serverName}>{p.name.split('/').pop() ?? p.name}</span>
-              <span className={styles.serverHost}>{p.hostname}</span>
-            </button>
+            <div className={styles.serverRow}>
+              <button
+                className={styles.serverItem}
+                onClick={() => handleConnect(p)}
+                disabled={!!connecting}
+                title={`${p.username}@${p.hostname}`}
+              >
+                {connecting === p.id ? (
+                  <Loader2 size={13} className={styles.spin} />
+                ) : (
+                  <Server size={13} />
+                )}
+                <span className={styles.serverName}>{p.name}</span>
+                <span className={styles.serverHost}>{p.hostname}</span>
+              </button>
+              <div className={styles.serverActions}>
+                <button
+                  className={styles.serverActionBtn}
+                  onClick={(e) => { e.stopPropagation(); setEditTarget(p); }}
+                  title="접속 정보 수정"
+                >
+                  <Pencil size={12} />
+                </button>
+                <button
+                  className={styles.serverActionBtn}
+                  onClick={(e) => { e.stopPropagation(); handleDelete(p); }}
+                  title="서버 삭제"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            </div>
             {dirs.length > 0 && (
               <div className={styles.serverDirs}>
                 {dirs.map((dir) => (
@@ -272,6 +433,11 @@ function EmptyServerList() {
           </div>
         );
       })}
+      <NewConnectionDialog
+        open={!!editTarget}
+        editProfile={editTarget}
+        onClose={() => setEditTarget(null)}
+      />
     </div>
   );
 }
@@ -344,7 +510,7 @@ function FileTreeNode({
   depth?: number;
   isRoot?: boolean;
 }) {
-  const { getChildren, isExpanded, isLoading, loadDir, toggleExpand, refreshDir, createFile, createDir, deletePath } =
+  const { getChildren, isExpanded, isLoading, loadDir, toggleExpand, refreshDir, createFile, createDir, deletePath, renamePath } =
     useFileTreeStore();
   const { openFile } = useEditorStore();
 
@@ -386,6 +552,16 @@ function FileTreeNode({
             onRefresh={() => refreshDir(connectionId, entry.path)}
             onCreateFile={async (name) => createFile(connectionId, joinPath(targetDir, name))}
             onCreateDir={async (name) => createDir(connectionId, joinPath(targetDir, name))}
+            onRename={async () => {
+              const newName = await promptText({
+                title: '이름 변경',
+                placeholder: '새 이름',
+                defaultValue: entry.name,
+              });
+              if (newName && newName !== entry.name) {
+                await renamePath(connectionId, entry.path, joinPath(parentDir(entry.path), newName));
+              }
+            }}
             onDelete={async () => {
               const ok = await confirm({
                 title: '삭제 확인',
@@ -417,6 +593,7 @@ function FileTreeItem({
   onRefresh,
   onCreateFile,
   onCreateDir,
+  onRename,
   onDelete,
 }: {
   entry: FileEntry;
@@ -427,12 +604,18 @@ function FileTreeItem({
   onRefresh: () => void;
   onCreateFile: (name: string) => Promise<void>;
   onCreateDir: (name: string) => Promise<void>;
+  onRename: () => void;
   onDelete: () => void;
 }) {
-  const { isExpanded, isLoading, isSelected, setSelected } = useFileTreeStore();
+  const { isExpanded, isLoading, isSelected, setSelected, dropDir, setDragging, setDropDir } =
+    useFileTreeStore();
   const expanded = isExpanded(connectionId, entry.path);
   const loading = isLoading(connectionId, entry.path);
   const selected = isSelected(connectionId, entry.path);
+
+  // 드롭 대상 디렉토리: 폴더 행이면 그 폴더, 파일 행이면 파일이 속한 폴더
+  const dropTargetDir = entry.isDir ? entry.path : parentDir(entry.path);
+  const isDropTarget = entry.isDir && dropDir === entry.path;
 
   const handleClick = () => {
     setSelected(connectionId, entry.path);
@@ -454,9 +637,36 @@ function FileTreeItem({
         {/* stopPropagation: 상위(루트) 컨텍스트 메뉴가 동시에 열리는 것을 방지 */}
         <div onContextMenu={(e) => e.stopPropagation()}>
           <div
-            className={`${styles.item} ${selected ? styles.selected : ''}`}
+            className={`${styles.item} ${selected ? styles.selected : ''} ${isDropTarget ? styles.dropTarget : ''}`}
             style={{ paddingLeft: depth * 12 + 4 }}
             onClick={handleClick}
+            draggable
+            onDragStart={(e) => {
+              // WKWebView 는 dragover 중 커스텀 dataTransfer 를 노출하지 않으므로 스토어로 전달
+              e.dataTransfer.setData('text/plain', entry.path);
+              e.dataTransfer.effectAllowed = 'move';
+              setDragging({ connectionId, entry });
+            }}
+            onDragEnd={() => {
+              setDragging(null);
+              setDropDir(null);
+            }}
+            onDragOver={(e) => {
+              if (!canAcceptTreeDrop(e, connectionId)) return;
+              if (!isValidMoveTarget(connectionId, dropTargetDir)) {
+                e.stopPropagation();
+                setDropDir(null);
+                return;
+              }
+              e.preventDefault();
+              e.stopPropagation();
+              setDropDir(dropTargetDir);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleTreeDrop(e, connectionId, dropTargetDir);
+            }}
           >
             <span className={styles.chevron}>
               {entry.isDir ? (
@@ -493,8 +703,8 @@ function FileTreeItem({
           {/* 새 파일/폴더 — 디렉토리면 그 안에, 파일이면 같은 폴더에 생성 */}
           <ContextMenu.Item
             className={styles.contextItem}
-            onSelect={() => {
-              const name = prompt('새 파일 이름:');
+            onSelect={async () => {
+              const name = await promptText({ title: '새 파일', placeholder: '파일 이름' });
               if (name) onCreateFile(name);
             }}
           >
@@ -502,8 +712,8 @@ function FileTreeItem({
           </ContextMenu.Item>
           <ContextMenu.Item
             className={styles.contextItem}
-            onSelect={() => {
-              const name = prompt('새 폴더 이름:');
+            onSelect={async () => {
+              const name = await promptText({ title: '새 폴더', placeholder: '폴더 이름' });
               if (name) onCreateDir(name);
             }}
           >
@@ -564,6 +774,9 @@ function FileTreeItem({
           )}
 
           <ContextMenu.Separator className={styles.separator} />
+          <ContextMenu.Item className={styles.contextItem} onSelect={onRename}>
+            <Pencil size={12} /> 이름 변경
+          </ContextMenu.Item>
           <ContextMenu.Item
             className={`${styles.contextItem} ${styles.danger}`}
             onSelect={onDelete}

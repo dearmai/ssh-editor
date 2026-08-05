@@ -73,6 +73,13 @@ export const sftpRenamePath = (sessionId: string, from: string, to: string) =>
 export const sftpCreateDir = (sessionId: string, path: string) =>
   invoke<void>('sftp_create_dir', { sessionId, path });
 
+export const sftpExists = (sessionId: string, path: string) =>
+  invoke<boolean>('sftp_exists', { sessionId, path });
+
+/** 디렉토리에 항목 생성/이동 권한(w+x)이 있는지 사전 점검 */
+export const sftpCheckWriteAccess = (sessionId: string, path: string) =>
+  invoke<boolean>('sftp_check_write_access', { sessionId, path });
+
 // --- 전송 (업로드/다운로드) ---
 export const sftpProbe = (sessionId: string, path: string) =>
   invoke<ProbeResult>('sftp_probe', { sessionId, path });
@@ -83,6 +90,14 @@ export const sftpUpload = (
   remotePath: string,
   transferId: string
 ) => invoke<void>('sftp_upload', { sessionId, localPath, remotePath, transferId });
+
+/** 드래그 앤 드롭 업로드 — 웹뷰 File 은 로컬 경로가 없어 base64 bytes 로 전송 */
+export const sftpUploadData = (
+  sessionId: string,
+  remotePath: string,
+  dataB64: string,
+  transferId: string
+) => invoke<void>('sftp_upload_data', { sessionId, remotePath, dataB64, transferId });
 
 export const sftpDownload = (
   sessionId: string,

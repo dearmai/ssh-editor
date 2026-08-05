@@ -141,7 +141,10 @@ pub fn run(startup_args: Option<StartupArgs>) {
             sftp_rename_path,
             sftp_create_dir,
             sftp_probe,
+            sftp_exists,
+            sftp_check_write_access,
             sftp_upload,
+            sftp_upload_data,
             sftp_download,
             sftp_download_dir,
             // 터미널

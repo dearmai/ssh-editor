@@ -1,4 +1,5 @@
 use crate::error::{AppError, AppResult};
+use crate::ssh::connection::{run_command, shell_quote};
 use crate::ssh::SshSession;
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -149,6 +150,23 @@ pub async fn rename_path(session: &SshSession, from: &str, to: &str) -> AppResul
 
     sftp.rename(from, to).await?;
     Ok(())
+}
+
+/// 경로 존재 여부 (업로드/이동 전 이름 충돌 사전 점검용)
+pub async fn exists(session: &SshSession, path: &str) -> AppResult<bool> {
+    let sftp_guard = session.sftp.lock().await;
+    let sftp = sftp_guard
+        .as_ref()
+        .ok_or_else(|| AppError::Other("SFTP 세션이 없습니다".to_string()))?;
+
+    Ok(sftp.metadata(path).await.is_ok())
+}
+
+/// 디렉토리에 항목 생성/이동이 가능한지 사전 점검 (원격 shell 의 test -w/-x 로 실효 권한 확인)
+pub async fn check_write_access(session: &SshSession, dir: &str) -> AppResult<bool> {
+    let q = shell_quote(dir);
+    let (_, code) = run_command(session, &format!("test -w {} && test -x {}", q, q)).await?;
+    Ok(code == 0)
 }
 
 pub async fn create_dir(session: &SshSession, path: &str) -> AppResult<()> {

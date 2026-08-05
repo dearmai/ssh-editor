@@ -16,6 +16,14 @@ interface FileTreeStore {
   selectedPaths: Map<ConnectionId, Path>;
   loadingPaths: Set<string>; // `${connectionId}:${path}`
 
+  // DnD: 드래그 중인 트리 항목 (WKWebView 는 dragover 중 dataTransfer 커스텀 데이터를
+  // 노출하지 않으므로 스토어 상태로 전달)
+  dragging: { connectionId: string; entry: FileEntry } | null;
+  // DnD: 현재 드롭 대상 디렉토리 (하이라이트용)
+  dropDir: Path | null;
+  setDragging: (d: { connectionId: string; entry: FileEntry } | null) => void;
+  setDropDir: (path: Path | null) => void;
+
   loadDir: (connectionId: string, path: string) => Promise<FileEntry[]>;
   toggleExpand: (connectionId: string, path: string) => void;
   refreshDir: (connectionId: string, path: string) => Promise<void>;
@@ -33,6 +41,8 @@ interface FileTreeStore {
   createDir: (connectionId: string, path: string) => Promise<void>;
   deletePath: (connectionId: string, path: string) => Promise<void>;
   renamePath: (connectionId: string, from: string, to: string) => Promise<void>;
+  /** from 을 toDir 디렉토리 안으로 이동 (이름 유지). 원본·대상 디렉토리를 모두 새로 고침 */
+  movePath: (connectionId: string, from: string, toDir: string) => Promise<void>;
 }
 
 export const useFileTreeStore = create<FileTreeStore>((set, get) => ({
@@ -41,6 +51,11 @@ export const useFileTreeStore = create<FileTreeStore>((set, get) => ({
   rootPaths: new Map(),
   selectedPaths: new Map(),
   loadingPaths: new Set(),
+  dragging: null,
+  dropDir: null,
+
+  setDragging: (d) => set({ dragging: d }),
+  setDropDir: (path) => set((s) => (s.dropDir === path ? s : { dropDir: path })),
 
   loadDir: async (connectionId, path) => {
     const cacheKey = `${connectionId}:${path}`;
@@ -166,5 +181,14 @@ export const useFileTreeStore = create<FileTreeStore>((set, get) => ({
     await sftpRenamePath(connectionId, from, to);
     const parentPath = from.split('/').slice(0, -1).join('/') || '/';
     await get().refreshDir(connectionId, parentPath);
+  },
+
+  movePath: async (connectionId, from, toDir) => {
+    const name = from.split('/').pop() ?? from;
+    const to = toDir.endsWith('/') ? `${toDir}${name}` : `${toDir}/${name}`;
+    await sftpRenamePath(connectionId, from, to);
+    const fromParent = from.split('/').slice(0, -1).join('/') || '/';
+    await get().refreshDir(connectionId, fromParent);
+    await get().refreshDir(connectionId, toDir);
   },
 }));

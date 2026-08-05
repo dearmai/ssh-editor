@@ -90,6 +90,15 @@
   background: var(--bg-active);
 }
 
+/* DnD 드롭 대상 하이라이트 */
+.item.dropTarget {
+  background: var(--bg-active);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.treeDropActive {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
 .chevron {
   width: 16px;
   display: flex;
@@ -163,7 +172,15 @@
   gap: 2px;
 }
 
+.serverRow {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
 .serverItem {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -173,6 +190,35 @@
   background: var(--bg-primary);
   color: var(--text-primary);
   text-align: left;
+}
+
+/* 수정/삭제 버튼 — 행 hover 시 노출 */
+.serverActions {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.serverRow:hover .serverActions {
+  opacity: 1;
+}
+.serverActionBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+}
+.serverActionBtn:hover {
+  background: var(--bg-active);
+  color: var(--text-primary);
 }
 .serverItem:hover:not(:disabled) {
   background: var(--bg-hover);

@@ -1,7 +1,15 @@
 import { create } from 'zustand';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
-import { sftpDownload, sftpDownloadDir, sftpUpload } from '../ipc/commands';
+import {
+  sftpCheckWriteAccess,
+  sftpDownload,
+  sftpDownloadDir,
+  sftpExists,
+  sftpUpload,
+  sftpUploadData,
+} from '../ipc/commands';
 import type { ArchiveFormat, TransferProgressEvent } from '../types';
+import { confirm } from './confirmStore';
 import { log } from './logStore';
 import { useFileTreeStore } from './fileTreeStore';
 
@@ -24,6 +32,8 @@ interface TransferStore {
   transfers: Transfer[];
   applyProgress: (e: TransferProgressEvent) => void;
   uploadFiles: (sessionId: string, remoteDir: string) => Promise<void>;
+  /** 드래그 앤 드롭으로 받은 File 객체들을 업로드 (권한·이름 충돌 사전 점검 포함) */
+  uploadDroppedFiles: (sessionId: string, remoteDir: string, files: File[]) => Promise<void>;
   downloadFile: (sessionId: string, remotePath: string, name: string) => Promise<void>;
   downloadDir: (
     sessionId: string,
@@ -45,6 +55,19 @@ function joinPath(dir: string, name: string): string {
 
 function extFor(format: ArchiveFormat): string {
   return format === 'zip' ? 'zip' : format === 'tarxz' ? 'tar.xz' : 'tar.gz';
+}
+
+/** File → base64 (data URL 의 페이로드 부분) */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error('파일 읽기 실패'));
+    reader.onload = () => {
+      const url = reader.result as string;
+      resolve(url.slice(url.indexOf(',') + 1));
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 export const useTransferStore = create<TransferStore>((set) => ({
@@ -81,6 +104,60 @@ export const useTransferStore = create<TransferStore>((set) => ({
         transfers: [
           ...s.transfers,
           { id, kind: 'upload', name, remotePath, localPath, total: 0, transferred: 0, status: 'queued', startedAt: Date.now() },
+        ],
+      }));
+    }
+    kick();
+  },
+
+  uploadDroppedFiles: async (sessionId, remoteDir, files) => {
+    if (files.length === 0) return;
+
+    // 1) 대상 디렉토리 쓰기 권한 사전 점검 (점검 자체가 실패하면 실제 업로드에서 판정)
+    try {
+      const writable = await sftpCheckWriteAccess(sessionId, remoteDir);
+      if (!writable) {
+        log.error(`업로드 불가: ${remoteDir} 에 쓰기 권한이 없습니다`);
+        await confirm({
+          title: '업로드 불가',
+          message: `대상 디렉토리에 쓰기 권한이 없습니다: ${remoteDir}`,
+          confirmLabel: '확인',
+        });
+        return;
+      }
+    } catch (e) {
+      log.warn(`권한 사전 점검 실패, 업로드 계속 시도: ${e}`);
+    }
+
+    // 2) 이름 충돌 사전 점검 → 덮어쓰기 확인
+    const collisions: string[] = [];
+    for (const f of files) {
+      const exists = await sftpExists(sessionId, joinPath(remoteDir, f.name)).catch(() => false);
+      if (exists) collisions.push(f.name);
+    }
+    if (collisions.length > 0) {
+      const ok = await confirm({
+        title: '덮어쓰기 확인',
+        message: `이미 존재하는 파일 ${collisions.length}개를 덮어씁니다: ${collisions.join(', ')}`,
+        confirmLabel: '덮어쓰기',
+        danger: true,
+      });
+      if (!ok) return;
+    }
+
+    // 3) 전송 큐에 추가
+    for (const file of files) {
+      const remotePath = joinPath(remoteDir, file.name);
+      const id = crypto.randomUUID();
+      runners.set(id, async () => {
+        const dataB64 = await fileToBase64(file);
+        await sftpUploadData(sessionId, remotePath, dataB64, id);
+        await useFileTreeStore.getState().refreshDir(sessionId, remoteDir).catch(() => {});
+      });
+      set((s) => ({
+        transfers: [
+          ...s.transfers,
+          { id, kind: 'upload', name: file.name, remotePath, localPath: '(드래그 앤 드롭)', total: file.size, transferred: 0, status: 'queued', startedAt: Date.now() },
         ],
       }));
     }
