@@ -10,6 +10,7 @@ export const LANGUAGES: LanguageOption[] = [
   { id: 'bat', label: 'Batch' },
   { id: 'bicep', label: 'Bicep' },
   { id: 'c', label: 'C' },
+  { id: 'caddyfile', label: 'Caddyfile' },
   { id: 'clojure', label: 'Clojure' },
   { id: 'coffeescript', label: 'CoffeeScript' },
   { id: 'cpp', label: 'C++' },

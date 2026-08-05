@@ -59,6 +59,8 @@ const EXT_MAP: Record<string, string> = {
   env: 'shell',
   conf: 'ini',
   nginx: 'nginx',
+  caddy: 'caddyfile',
+  caddyfile: 'caddyfile',
   log: 'plaintext',
   txt: 'plaintext',
 };
@@ -72,6 +74,7 @@ export function detectLanguage(filePath: string): string {
   if (lower === 'makefile' || lower === 'gnumakefile') return 'makefile';
   if (lower === '.env' || lower.startsWith('.env.')) return 'shell';
   if (lower === 'nginx.conf' || lower.endsWith('.nginx')) return 'nginx';
+  if (lower === 'caddyfile' || lower.endsWith('.caddy') || lower.endsWith('.caddyfile')) return 'caddyfile';
 
   const dotIdx = fileName.lastIndexOf('.');
   if (dotIdx === -1) return 'plaintext';

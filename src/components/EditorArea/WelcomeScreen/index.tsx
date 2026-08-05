@@ -1,6 +1,7 @@
-import { FolderOpen, Loader2, Plus, Server, X } from 'lucide-react';
+import { FolderOpen, Loader2, Pencil, Plus, Server, Trash2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useConnectionStore } from '../../../stores/connectionStore';
+import { confirm } from '../../../stores/confirmStore';
 import { useFileTreeStore } from '../../../stores/fileTreeStore';
 import type { ConnectionProfile } from '../../../types';
 import NewConnectionDialog from '../../Dialogs/NewConnectionDialog';
@@ -18,7 +19,7 @@ function ConnectedEmptyState() {
       <div className={styles.appHeader}>
         <FolderOpen size={36} className={styles.appIcon} />
         <h1 className={styles.appTitle}>
-          {conn ? conn.profile.name.split('/').pop() ?? conn.profile.name : '연결됨'}
+          {conn ? conn.profile.name : '연결됨'}
         </h1>
         <p className={styles.appSub}>좌측 파일 트리에서 파일을 선택하세요</p>
       </div>
@@ -27,10 +28,12 @@ function ConnectedEmptyState() {
 }
 
 export default function WelcomeScreen() {
-  const { profiles, activeConnections, selectedSessionId, connect } = useConnectionStore();
+  const { profiles, activeConnections, selectedSessionId, connect, removeProfile } =
+    useConnectionStore();
   const { setRootPath, loadDir } = useFileTreeStore();
 
   const [showDialog, setShowDialog] = useState(false);
+  const [editTarget, setEditTarget] = useState<ConnectionProfile | null>(null);
   const [connecting, setConnecting] = useState<string | null>(null);
   const [showCancel, setShowCancel] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +53,20 @@ export default function WelcomeScreen() {
     clearTimers();
     setConnecting(null);
     setShowCancel(false);
+  };
+
+  const handleDelete = async (profile: ConnectionProfile) => {
+    const ok = await confirm({
+      title: '서버 삭제',
+      message: (
+        <>
+          <strong>{profile.name}</strong> 서버를 목록에서 삭제할까요?
+        </>
+      ),
+      confirmLabel: '삭제',
+      danger: true,
+    });
+    if (ok) removeProfile(profile.id);
   };
 
   const handleConnect = async (profile: ConnectionProfile, startPath?: string) => {
@@ -141,7 +158,7 @@ export default function WelcomeScreen() {
             <div className={styles.groupTitle}>저장된 서버</div>
             <div className={styles.cards}>
               {profiles.map((profile) => {
-                const shortName = profile.name.split('/').pop() ?? profile.name;
+                const shortName = profile.name;
                 const isConn = connecting === profile.id;
                 const dirs = profile.directories ?? [];
                 return (
@@ -149,6 +166,24 @@ export default function WelcomeScreen() {
                     key={profile.id}
                     className={`${styles.card} ${isConn ? styles.connecting : ''}`}
                   >
+                    <div className={styles.cardActions}>
+                      <button
+                        className={styles.cardActionBtn}
+                        onClick={(e) => { e.stopPropagation(); setEditTarget(profile); }}
+                        disabled={!!connecting}
+                        title="접속 정보 수정"
+                      >
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        className={styles.cardActionBtn}
+                        onClick={(e) => { e.stopPropagation(); handleDelete(profile); }}
+                        disabled={!!connecting}
+                        title="서버 삭제"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
                     <button
                       className={styles.cardMain}
                       onClick={() => handleConnect(profile)}
@@ -197,6 +232,11 @@ export default function WelcomeScreen() {
       </button>
 
       <NewConnectionDialog open={showDialog} onClose={() => setShowDialog(false)} />
+      <NewConnectionDialog
+        open={!!editTarget}
+        editProfile={editTarget}
+        onClose={() => setEditTarget(null)}
+      />
     </div>
   );
 }

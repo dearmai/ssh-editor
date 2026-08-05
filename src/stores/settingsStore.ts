@@ -127,6 +127,13 @@ export function applyUiFont(settings: Pick<Settings, 'uiFontFamily' | 'uiFontSiz
   root.style.setProperty('--font-size-base', `${settings.uiFontSize}px`);
 }
 
+/** 에디터/터미널 monospace 폰트를 CSS 변수로 노출 (xterm 렌더 폰트 강제용) */
+export function applyEditorFont(settings: Pick<Settings, 'editorFontFamily' | 'editorFontSize'>) {
+  const root = document.documentElement;
+  root.style.setProperty('--font-mono', settings.editorFontFamily);
+  root.style.setProperty('--editor-font-size', `${settings.editorFontSize}px`);
+}
+
 export function applyTheme(resolved: ResolvedTheme) {
   document.documentElement.setAttribute('data-theme', resolved);
 }

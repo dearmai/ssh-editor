@@ -37,14 +37,23 @@ export default function TerminalPane({ sessionId, connectionId: _connectionId, v
     effectiveType
   ).terminal;
 
+  // xterm은 숨김(width 0) 상태에서 생성되면 char 폭 측정에 실패해 기본 monospace로
+  // 렌더된 뒤 갱신되지 않는다. fit/refresh만으론 폰트 CSS가 재주입되지 않으므로,
+  // fontFamily를 다른 값으로 한 번 흔들어(nudge) 렌더러의 재측정·폰트 재주입을 강제한다.
+  const remeasureFont = (term: Terminal) => {
+    term.options.fontFamily = 'monospace';
+    term.options.fontFamily = editorFontFamily;
+    term.options.fontSize = editorFontSize;
+    fitRef.current?.fit();
+    term.refresh(0, term.rows - 1);
+  };
+
   // 폰트/테마 변경 시 기존 터미널에 반영
   useEffect(() => {
     const term = termRef.current;
     if (!term) return;
-    term.options.fontFamily = editorFontFamily;
-    term.options.fontSize = editorFontSize;
     term.options.theme = termTheme;
-    fitRef.current?.fit();
+    remeasureFont(term);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editorFontFamily, editorFontSize, termTheme]);
 
@@ -68,6 +77,12 @@ export default function TerminalPane({ sessionId, connectionId: _connectionId, v
 
     termRef.current = term;
     fitRef.current = fitAddon;
+
+    // 생성 직후(숨김 상태일 수 있음) 폰트 재측정 강제 + 폰트 로드 완료 후 한 번 더
+    remeasureFont(term);
+    document.fonts?.ready.then(() => {
+      if (termRef.current === term) remeasureFont(term);
+    });
 
     // 터미널 출력 수신
     const unlistenPromise = onTerminalData((payload) => {
@@ -110,9 +125,9 @@ export default function TerminalPane({ sessionId, connectionId: _connectionId, v
       const fit = fitRef.current;
       if (!term || !fit) return;
       try {
-        fit.fit();
+        // 숨김 상태에서 생성돼 폰트 측정이 빗나갔을 수 있으니 표시될 때 재측정
+        remeasureFont(term);
         terminalResize(sessionId, term.cols, term.rows);
-        term.refresh(0, term.rows - 1);
         term.scrollToBottom();
       } catch {
         /* 디스포즈 직후 등 — 무시 */

@@ -22,7 +22,7 @@ export default function SidePanel() {
               className={styles.serverName}
               title={`${conn.profile.username}@${conn.profile.hostname}`}
             >
-              {conn.profile.name.split('/').pop() ?? conn.profile.name}
+              {conn.profile.name}
             </span>
             <div className={styles.headerActions}>
               {activeConnections.length > 1 && (
@@ -33,7 +33,7 @@ export default function SidePanel() {
                 >
                   {activeConnections.map((c) => (
                     <option key={c.sessionId} value={c.sessionId}>
-                      {c.profile.name.split('/').pop() ?? c.profile.name}
+                      {c.profile.name}
                     </option>
                   ))}
                 </select>

@@ -11,6 +11,7 @@ import SettingsDialog from './components/Dialogs/SettingsDialog';
 import SaveConflictDialog from './components/Dialogs/SaveConflictDialog';
 import OpenFileDialog from './components/Dialogs/OpenFileDialog';
 import ConfirmDialog from './components/Dialogs/ConfirmDialog';
+import PromptDialog from './components/Dialogs/PromptDialog';
 import ReconnectDialog from './components/Dialogs/ReconnectDialog';
 import ExternalChangeDialog from './components/Dialogs/ExternalChangeDialog';
 import ThemePicker from './components/ThemePicker';
@@ -22,6 +23,7 @@ import { useEditorStore } from './stores/editorStore';
 import { useTransferStore } from './stores/transferStore';
 import { useFileTreeStore } from './stores/fileTreeStore';
 import {
+  applyEditorFont,
   applyUiFont,
   effectiveTheme,
   useSettingsStore,
@@ -38,6 +40,8 @@ export default function App() {
 
   const uiFontFamily = useSettingsStore((s) => s.uiFontFamily);
   const uiFontSize = useSettingsStore((s) => s.uiFontSize);
+  const editorFontFamily = useSettingsStore((s) => s.editorFontFamily);
+  const editorFontSize = useSettingsStore((s) => s.editorFontSize);
   const theme = useSettingsStore((s) => s.theme);
   const themeOverrides = useSettingsStore((s) => s.themeOverrides);
   const darkTheme = useSettingsStore((s) => s.darkTheme);
@@ -146,6 +150,11 @@ export default function App() {
     applyUiFont({ uiFontFamily, uiFontSize });
   }, [uiFontFamily, uiFontSize]);
 
+  // 에디터/터미널 monospace 폰트를 CSS 변수로 적용 (xterm 렌더 폰트 강제)
+  useEffect(() => {
+    applyEditorFont({ editorFontFamily, editorFontSize });
+  }, [editorFontFamily, editorFontSize]);
+
   // 테마 적용 (폴더 → 서버 → 전역 해석 + 시스템 변경 추적)
   useEffect(() => {
     const apply = () => {
@@ -210,6 +219,7 @@ export default function App() {
       <SaveConflictDialog />
       <OpenFileDialog />
       <ConfirmDialog />
+      <PromptDialog />
       <ReconnectDialog />
       <ExternalChangeDialog />
     </div>

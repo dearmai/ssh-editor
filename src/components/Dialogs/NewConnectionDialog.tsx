@@ -9,11 +9,14 @@ import styles from './Dialog.module.css';
 interface Props {
   open: boolean;
   onClose: () => void;
+  /** 지정 시 편집 모드 — 해당 프로필을 수정/저장 (연결하지 않음) */
+  editProfile?: ConnectionProfile | null;
 }
 
-export default function NewConnectionDialog({ open, onClose }: Props) {
-  const { addProfile, connect, sshConfigHosts, loadAll } = useConnectionStore();
+export default function NewConnectionDialog({ open, onClose, editProfile }: Props) {
+  const { addProfile, updateProfile, connect, sshConfigHosts, loadAll } = useConnectionStore();
   const { setRootPath, loadDir } = useFileTreeStore();
+  const isEdit = !!editProfile;
 
   const [form, setForm] = useState({
     name: '',
@@ -35,6 +38,32 @@ export default function NewConnectionDialog({ open, onClose }: Props) {
       loadAll();
     }
   }, [open]);
+
+  // 다이얼로그가 열릴 때 폼 초기화 — 편집 모드면 프로필 값으로 채움
+  useEffect(() => {
+    if (!open) return;
+    setError('');
+    setShowImport(false);
+    if (editProfile) {
+      setForm({
+        name: editProfile.name ?? '',
+        hostname: editProfile.hostname ?? '',
+        port: String(editProfile.port ?? 22),
+        username: editProfile.username ?? '',
+        authType: editProfile.authType,
+        password: editProfile.password ?? '',
+        identityFile: editProfile.identityFile ?? '',
+        saveProfile: true,
+      });
+      setDirectories(editProfile.directories ?? []);
+    } else {
+      setForm({
+        name: '', hostname: '', port: '22', username: '',
+        authType: 'agent', password: '', identityFile: '', saveProfile: true,
+      });
+      setDirectories([]);
+    }
+  }, [open, editProfile]);
 
   const handleImport = (host: SshConfigHost) => {
     setForm((prev) => ({
@@ -61,7 +90,7 @@ export default function NewConnectionDialog({ open, onClose }: Props) {
 
     const dirs = directories.map((d) => d.trim()).filter(Boolean);
     const profile: ConnectionProfile = {
-      id: crypto.randomUUID(),
+      id: editProfile?.id ?? crypto.randomUUID(),
       name: form.name || `${form.username}@${form.hostname}`,
       hostname: form.hostname.trim(),
       port: parseInt(form.port) || 22,
@@ -69,10 +98,17 @@ export default function NewConnectionDialog({ open, onClose }: Props) {
       authType: form.authType,
       password: form.authType === 'password' ? form.password : undefined,
       identityFile: form.authType === 'publicKey' ? form.identityFile.trim() : undefined,
+      lastPath: editProfile?.lastPath,
       directories: dirs,
     };
 
     try {
+      // 편집 모드: 저장만 하고 연결하지 않음
+      if (isEdit) {
+        await updateProfile(profile);
+        onClose();
+        return;
+      }
       if (form.saveProfile) {
         await addProfile(profile);
       }
@@ -97,7 +133,7 @@ export default function NewConnectionDialog({ open, onClose }: Props) {
         <Dialog.Overlay className={styles.overlay} />
         <Dialog.Content className={styles.content}>
           <div className={styles.header}>
-            <Dialog.Title className={styles.title}>새 SSH 연결</Dialog.Title>
+            <Dialog.Title className={styles.title}>{isEdit ? 'SSH 연결 수정' : '새 SSH 연결'}</Dialog.Title>
             <Dialog.Close className={styles.closeBtn}>
               <X size={16} />
             </Dialog.Close>
@@ -274,21 +310,23 @@ export default function NewConnectionDialog({ open, onClose }: Props) {
               </button>
             </div>
 
-            <label className={styles.checkLabel}>
-              <input
-                type="checkbox"
-                checked={form.saveProfile}
-                onChange={(e) => set('saveProfile', e.target.checked)}
-              />
-              서버 목록에 저장
-            </label>
+            {!isEdit && (
+              <label className={styles.checkLabel}>
+                <input
+                  type="checkbox"
+                  checked={form.saveProfile}
+                  onChange={(e) => set('saveProfile', e.target.checked)}
+                />
+                서버 목록에 저장
+              </label>
+            )}
 
             {error && <div className={styles.error}>{error}</div>}
 
             <div className={styles.buttons}>
               <Dialog.Close className={styles.cancelBtn}>취소</Dialog.Close>
               <button type="submit" className={styles.submitBtn} disabled={loading}>
-                {loading ? '연결 중...' : '연결'}
+                {isEdit ? '저장' : loading ? '연결 중...' : '연결'}
               </button>
             </div>
           </form>

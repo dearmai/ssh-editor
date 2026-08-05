@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useEditorStore } from '../../../stores/editorStore';
 import { useSettingsStore } from '../../../stores/settingsStore';
 import { defineMonacoThemes, getTheme, monacoThemeName } from '../../../themes';
+import { registerCaddyLanguage } from '../../../utils/caddyLang';
 import styles from './MonacoPane.module.css';
 
 interface Props {
@@ -29,9 +30,19 @@ export default function MonacoPane({ tabId }: Props) {
   // 이 컴포넌트 인스턴스마다 고유한 path를 부여해 모델을 완전히 분리한다 (마운트당 1회 생성).
   const modelPath = useRef(`m${Math.random().toString(36).slice(2)}-${tabId}`.replace(/:/g, '_')).current;
 
+  // remeasureFonts는 런타임엔 있으나 일부 monaco 타입 정의에 누락 → 느슨하게 처리
+  type Remeasurable = { remeasureFonts?: () => void };
+  const editorRef = useRef<Remeasurable | null>(null);
+
   const handleSave = useCallback(async () => {
     await saveTab(tabId);
   }, [tabId, saveTab]);
+
+  // 폰트 변경 시 Monaco가 글리프 폭을 다시 측정하도록 강제.
+  // (WKWebView는 폰트 로드 전 측정하면 fallback 폰트 metrics로 그려 터미널과 달라 보임)
+  useEffect(() => {
+    editorRef.current?.remeasureFonts?.();
+  }, [editorFontFamily, editorFontSize]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -54,8 +65,16 @@ export default function MonacoPane({ tabId }: Props) {
         value={tab.content}
         language={tab.language}
         theme={monacoTheme}
-        beforeMount={(monaco) => defineMonacoThemes(monaco)}
+        beforeMount={(monaco) => {
+          defineMonacoThemes(monaco);
+          registerCaddyLanguage(monaco);
+        }}
         onMount={(editor) => {
+          const e = editor as unknown as Remeasurable;
+          editorRef.current = e;
+          // 폰트가 실제 로드된 뒤 다시 측정 → 터미널(xterm)과 동일 폰트로 렌더
+          e.remeasureFonts?.();
+          document.fonts?.ready.then(() => e.remeasureFonts?.());
           // 편집 창에 포커스가 들어올 때 서버 측 외부 변경 검사
           editor.onDidFocusEditorWidget(() => {
             checkExternalChange(tabId);

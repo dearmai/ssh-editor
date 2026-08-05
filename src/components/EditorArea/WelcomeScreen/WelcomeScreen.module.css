@@ -142,6 +142,7 @@
 }
 
 .card {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -152,6 +153,39 @@
   transition: background 0.1s, border-color 0.1s;
   min-width: 0;
   width: 100%;
+}
+
+/* 수정/삭제 버튼 — 카드 hover 시 노출 */
+.cardActions {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.12s;
+  z-index: 1;
+}
+.card:hover .cardActions {
+  opacity: 1;
+}
+.cardActionBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+}
+.cardActionBtn:hover:not(:disabled) {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+.cardActionBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 .card:hover {
   border-color: var(--accent);

@@ -87,6 +87,16 @@ html, body, #root {
   height: 100%;
 }
 
+/* 터미널(xterm) 폰트 강제 — xterm 자체 주입 폰트가 설정과 어긋나는 경우 방지.
+   측정용 옵션(term.options.fontFamily)은 동일 값이라 셀 정렬도 유지됨. */
+.xterm,
+.xterm .xterm-rows,
+.xterm .xterm-rows span,
+.xterm .xterm-screen,
+.xterm .xterm-char-measure-element {
+  font-family: var(--font-mono) !important;
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
