@@ -5,9 +5,11 @@ import '@xterm/xterm/css/xterm.css';
 import { useEffect, useRef } from 'react';
 import { onTerminalData } from '../../../ipc/events';
 import { terminalWrite, terminalResize } from '../../../ipc/commands';
+import { log } from '../../../stores/logStore';
 import { useSettingsStore } from '../../../stores/settingsStore';
 import { useTerminalStore } from '../../../stores/terminalStore';
 import { getTheme } from '../../../themes';
+import { decodeOsc52Base64, writeClipboard } from '../../../utils/clipboard';
 import styles from './Terminal.module.css';
 
 interface Props {
@@ -82,6 +84,28 @@ export default function TerminalPane({ sessionId, connectionId: _connectionId, v
     remeasureFont(term);
     document.fonts?.ready.then(() => {
       if (termRef.current === term) remeasureFont(term);
+    });
+
+    // OSC 52 — 원격 pbcopy/tmux 등이 보낸 클립보드 쓰기를 로컬 클립보드에 반영
+    // 형식: ESC ] 52 ; <selection> ; <base64> BEL
+    term.parser.registerOscHandler(52, (data) => {
+      const sep = data.indexOf(';');
+      if (sep < 0) return true;
+      const payload = data.slice(sep + 1);
+      // '?'는 클립보드 읽기 요청 → 원격에 로컬 클립보드를 노출하지 않도록 무시
+      if (payload === '?') return true;
+      // '!' 또는 빈 값은 클립보드 비우기 요청 → 무시
+      if (payload === '' || payload === '!') return true;
+
+      try {
+        const text = decodeOsc52Base64(payload);
+        void writeClipboard(text).catch((e) => {
+          log.error(`클립보드 복사 실패: ${String(e)}`);
+        });
+      } catch (e) {
+        log.warn(`OSC 52 디코드 실패: ${String(e)}`);
+      }
+      return true;
     });
 
     // 터미널 출력 수신

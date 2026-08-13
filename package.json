@@ -15,7 +15,8 @@
     "native:debug": "bash scripts/native.sh debug",
     "native:release": "bash scripts/native.sh release",
     "native:run": "bash scripts/native.sh release --run",
-    "native:bundle": "bash scripts/native.sh release --bundle"
+    "native:bundle": "bash scripts/native.sh release --bundle",
+    "icons": "tauri icon src-tauri/icons/icon.svg"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
@@ -25,6 +26,7 @@
     "@radix-ui/react-scroll-area": "^1.2.9",
     "@radix-ui/react-tooltip": "^1.2.7",
     "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-clipboard-manager": "^2.3.2",
     "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-store": "^2.4.3",
     "@xterm/addon-fit": "^0.11.0",

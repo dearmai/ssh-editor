@@ -26,6 +26,7 @@ pub fn run(startup_args: Option<StartupArgs>) {
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .manage(SshConnectionPool::new())
         .manage(TerminalPool::new())
         .manage(StartupArgsState(Mutex::new(startup_args)))

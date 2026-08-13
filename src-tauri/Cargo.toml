@@ -40,6 +40,7 @@ log          = { version = "0.4" }
 async-trait  = { version = "0.1" }
 regex        = { version = "1" }
 once_cell    = { version = "1" }
+tauri-plugin-clipboard-manager = "2"
 
 [features]
 default = ["custom-protocol"]

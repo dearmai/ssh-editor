@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- SSH Editor 앱 아이콘 소스.
+       수정 후 `npm run icons` (또는 npx tauri icon src-tauri/icons/icon.svg) 로 재생성. -->
+  <defs>
+    <linearGradient id="bg" gradientUnits="userSpaceOnUse" x1="512" y1="100" x2="512" y2="924">
+      <stop offset="0" stop-color="#2b3444"/>
+      <stop offset="1" stop-color="#141a23"/>
+    </linearGradient>
+    <!-- userSpaceOnUse 필수: 수평선(bbox 높이 0)에 objectBoundingBox 그라디언트를 쓰면 렌더링 안 됨 -->
+    <linearGradient id="accent" gradientUnits="userSpaceOnUse" x1="268" y1="452" x2="756" y2="728">
+      <stop offset="0" stop-color="#3aa0ee"/>
+      <stop offset="1" stop-color="#007acc"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 본체: macOS 아이콘 규격(1024 캔버스, 824 아트웍) -->
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
+  <!-- 상단 하이라이트 테두리 -->
+  <rect x="108" y="108" width="808" height="808" rx="177"
+        fill="none" stroke="#ffffff" stroke-opacity="0.10" stroke-width="4"/>
+
+  <!-- 타이틀바 구분선 + 신호등 점 -->
+  <path d="M100 268 H924" stroke="#ffffff" stroke-opacity="0.09" stroke-width="4"/>
+  <circle cx="196" cy="197" r="22" fill="#ffffff" fill-opacity="0.22"/>
+  <circle cx="264" cy="197" r="22" fill="#ffffff" fill-opacity="0.16"/>
+  <circle cx="332" cy="197" r="22" fill="#ffffff" fill-opacity="0.16"/>
+
+  <!-- 프롬프트 셰브론 -->
+  <path d="M268 452 L436 590 L268 728"
+        fill="none" stroke="url(#accent)" stroke-width="72"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- 커서 바 -->
+  <path d="M528 728 H756"
+        fill="none" stroke="url(#accent)" stroke-width="72" stroke-linecap="round"/>
+</svg>
