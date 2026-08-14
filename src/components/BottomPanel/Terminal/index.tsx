@@ -24,18 +24,18 @@ export default function TerminalPane({ sessionId, connectionId: _connectionId, v
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
 
-  const editorFontFamily = useSettingsStore((s) => s.editorFontFamily);
-  const editorFontSize = useSettingsStore((s) => s.editorFontSize);
+  const terminalFontFamily = useSettingsStore((s) => s.terminalFontFamily);
+  const terminalFontSize = useSettingsStore((s) => s.terminalFontSize);
   const resolvedTheme = useSettingsStore((s) => s.resolvedTheme);
-  const darkTheme = useSettingsStore((s) => s.darkTheme);
-  const lightTheme = useSettingsStore((s) => s.lightTheme);
+  const terminalDarkTheme = useSettingsStore((s) => s.terminalDarkTheme);
+  const terminalLightTheme = useSettingsStore((s) => s.terminalLightTheme);
   // 터미널 개별 테마 오버라이드 (없으면 앱 테마)
   const sessionTheme = useTerminalStore(
     (s) => s.sessions.find((x) => x.id === sessionId)?.theme
   );
   const effectiveType = sessionTheme ?? resolvedTheme;
   const termTheme: ITheme = getTheme(
-    effectiveType === 'dark' ? darkTheme : lightTheme,
+    effectiveType === 'dark' ? terminalDarkTheme : terminalLightTheme,
     effectiveType
   ).terminal;
 
@@ -44,8 +44,8 @@ export default function TerminalPane({ sessionId, connectionId: _connectionId, v
   // fontFamily를 다른 값으로 한 번 흔들어(nudge) 렌더러의 재측정·폰트 재주입을 강제한다.
   const remeasureFont = (term: Terminal) => {
     term.options.fontFamily = 'monospace';
-    term.options.fontFamily = editorFontFamily;
-    term.options.fontSize = editorFontSize;
+    term.options.fontFamily = terminalFontFamily;
+    term.options.fontSize = terminalFontSize;
     fitRef.current?.fit();
     term.refresh(0, term.rows - 1);
   };
@@ -57,15 +57,15 @@ export default function TerminalPane({ sessionId, connectionId: _connectionId, v
     term.options.theme = termTheme;
     remeasureFont(term);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editorFontFamily, editorFontSize, termTheme]);
+  }, [terminalFontFamily, terminalFontSize, termTheme]);
 
   useEffect(() => {
     if (!containerRef.current) return;
 
     const term = new Terminal({
       theme: termTheme,
-      fontSize: editorFontSize,
-      fontFamily: editorFontFamily,
+      fontSize: terminalFontSize,
+      fontFamily: terminalFontFamily,
       scrollback: 5000,
       cursorBlink: true,
     });

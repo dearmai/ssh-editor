@@ -6,12 +6,13 @@
 #    make              도움말
 #    make env-check    개발 도구 설치 여부 점검 (누락 시 비정상 종료)
 #    make env-setup    개발 도구 자동 설치 (Win: winget / mac: brew+rustup)
-#    make install      npm 의존성 설치
-#    make dev          개발 모드 실행
-#    make build        배포 빌드 (설치파일/번들만 생성)
-#    make setup        설치파일 빌드 후 실행/설치
+#    make deps         npm 의존성 설치
+#    make install      빌드 후 설치
 #                        Win: NSIS/MSI 설치 마법사 실행
 #                        mac: .app 빌드 후 /Applications 에 설치
+#    make dev          개발 모드 실행
+#    make build        배포 빌드 (설치파일/번들만 생성)
+#    make setup        make install 별칭 (하위호환)
 #    make verify       타입 검증 (tsc + cargo check)
 #    make clean        빌드 산출물 정리
 #
@@ -36,7 +37,7 @@ else
 endif
 
 .DEFAULT_GOAL := help
-.PHONY: help env-check env-setup setup install dev build native verify frontend rust clean
+.PHONY: help env-check env-setup setup install deps dev build native verify frontend rust clean
 
 # ============================================================================
 #  Windows
@@ -51,11 +52,15 @@ env-check:
 env-setup:
 	@$(PS) scripts/setup-env.ps1
 
-setup: install
+deps:
+	npm install
+
+# 빌드 후 설치 (NSIS/MSI 설치 마법사 실행)
+install: deps
 	@$(PS) scripts/install-app.ps1
 
-install:
-	npm install
+# 하위호환: 기존 make setup 은 make install 과 동일
+setup: install
 
 dev:
 	npm run tauri:dev
@@ -83,11 +88,15 @@ env-check:
 env-setup:
 	@bash scripts/setup-env.sh
 
-setup: install
+deps:
+	npm install
+
+# .app 빌드 후 /Applications 에 설치
+install: deps
 	@bash scripts/install-app.sh
 
-install:
-	npm install
+# 하위호환: 기존 make setup 은 make install 과 동일
+setup: install
 
 dev:
 	npm run native
@@ -115,10 +124,11 @@ help:
 	@echo ""
 	@echo "  make env-check   개발 도구 설치 여부 점검"
 	@echo "  make env-setup   개발 도구 자동 설치"
-	@echo "  make install     npm 의존성 설치"
+	@echo "  make deps        npm 의존성 설치"
+	@echo "  make install     빌드 후 설치 (mac: /Applications)"
 	@echo "  make dev         개발 모드 실행"
 	@echo "  make build       배포 빌드 (설치파일/번들 생성)"
-	@echo "  make setup       설치파일 빌드 후 실행/설치"
+	@echo "  make setup       make install 별칭 (하위호환)"
 	@echo "  make verify      타입 검증 (tsc + cargo check)"
 	@echo "  make clean       빌드 산출물 정리"
 	@echo ""

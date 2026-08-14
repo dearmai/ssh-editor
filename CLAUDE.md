@@ -17,8 +17,9 @@ npm run native:release   # release 빌드 → build/release/
 npm run build            # 프론트엔드만 (tsc + vite) — 타입 검증용
 cd src-tauri && cargo check   # Rust 타입 검증
 
-make setup               # 번들 빌드 → /Applications 설치 (scripts/install-app.sh)
-make                     # 전체 타깃 도움말 (make install 은 npm 의존성 설치)
+make install             # 번들 빌드 → /Applications 설치 (scripts/install-app.sh, setup 은 별칭)
+make deps                # npm 의존성 설치
+make                     # 전체 타깃 도움말
 npm run icons            # icons/icon.svg → icns/ico/png 재생성 (tauri icon)
 ```
 

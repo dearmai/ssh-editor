@@ -1,5 +1,6 @@
 .terminal {
   width: 100%;
   height: 100%;
-  padding: 4px;
+  /* 하단 상태바와 너무 붙지 않도록 아래쪽 여백 확대 */
+  padding: 4px 4px 10px;
 }

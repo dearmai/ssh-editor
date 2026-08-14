@@ -121,6 +121,21 @@ export default function SettingsDialog({ open, onClose }: Props) {
               onPick={(id) => s.set('lightTheme', id)}
             />
 
+            {/* 터미널 색상 테마 (에디터와 별개) */}
+            <div className={styles.sectionTitle}>터미널 다크 테마</div>
+            <ThemeChoices
+              list={DARK_THEMES}
+              value={s.terminalDarkTheme}
+              onPick={(id) => s.set('terminalDarkTheme', id)}
+            />
+
+            <div className={styles.sectionTitle}>터미널 라이트 테마</div>
+            <ThemeChoices
+              list={LIGHT_THEMES}
+              value={s.terminalLightTheme}
+              onPick={(id) => s.set('terminalLightTheme', id)}
+            />
+
             {/* 기본 UI 폰트 */}
             <div className={styles.sectionTitle}>기본 폰트 (UI)</div>
             <div className={styles.row}>
@@ -146,7 +161,7 @@ export default function SettingsDialog({ open, onClose }: Props) {
             </div>
 
             {/* 에디터 폰트 */}
-            <div className={styles.sectionTitle}>에디터 / 터미널 폰트 (monospace)</div>
+            <div className={styles.sectionTitle}>에디터 폰트 (monospace)</div>
             <div className={styles.row}>
               <div className={styles.field} style={{ flex: 1 }}>
                 <label className={styles.label}>폰트 패밀리 (monospace)</label>
@@ -171,6 +186,34 @@ export default function SettingsDialog({ open, onClose }: Props) {
 
             <div className={styles.preview} style={{ fontFamily: s.editorFontFamily, fontSize: s.editorFontSize }}>
               const greeting = "안녕하세요";  // 미리보기 0Oo1lI
+            </div>
+
+            {/* 터미널 폰트 (에디터와 별개) */}
+            <div className={styles.sectionTitle}>터미널 폰트 (monospace)</div>
+            <div className={styles.row}>
+              <div className={styles.field} style={{ flex: 1 }}>
+                <label className={styles.label}>폰트 패밀리 (monospace)</label>
+                <input
+                  value={s.terminalFontFamily}
+                  onChange={(e) => s.set('terminalFontFamily', e.target.value)}
+                  placeholder={DEFAULT_MONO_FONT}
+                  style={{ fontFamily: s.terminalFontFamily }}
+                />
+              </div>
+              <div className={styles.field} style={{ width: 90 }}>
+                <label className={styles.label}>크기 (px)</label>
+                <input
+                  type="number"
+                  min={9}
+                  max={28}
+                  value={s.terminalFontSize}
+                  onChange={(e) => s.set('terminalFontSize', Number(e.target.value) || 14)}
+                />
+              </div>
+            </div>
+
+            <div className={styles.preview} style={{ fontFamily: s.terminalFontFamily, fontSize: s.terminalFontSize }}>
+              user@host:~$ echo "안녕하세요"  0Oo1lI
             </div>
 
             <div className={styles.buttons}>

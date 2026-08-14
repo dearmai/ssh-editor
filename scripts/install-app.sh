@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SSH Editor - macOS 설치(앱 번들 빌드 후 /Applications에 설치) 스크립트
-# Makefile의 `make setup`이 호출함.
+# Makefile의 `make install`(= `make setup` 별칭)이 호출함.
 # 정식 .app 번들을 만든 뒤 운영 폴더(/Applications)에 복사한다.
 set -euo pipefail
 

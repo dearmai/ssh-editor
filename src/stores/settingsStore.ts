@@ -14,19 +14,26 @@ export interface Settings {
   /** 기본 UI 폰트 (sans-serif) */
   uiFontFamily: string;
   uiFontSize: number;
-  /** 에디터/터미널 폰트 (monospace) */
+  /** 에디터 폰트 (monospace) */
   editorFontFamily: string;
   editorFontSize: number;
+  /** 터미널 폰트 (monospace) — 에디터와 별개 */
+  terminalFontFamily: string;
+  terminalFontSize: number;
   /** 로그 최소 표시 레벨 */
   logLevelFilter: LogLevel | 'all';
   /** 전역 테마 모드 */
   theme: ThemeMode;
   /** 서버/폴더별 테마 오버라이드 (scopeKey → mode) */
   themeOverrides: Record<string, ThemeMode>;
-  /** 다크 모드일 때 사용할 색상 테마 id */
+  /** 다크 모드일 때 에디터·앱에 사용할 색상 테마 id */
   darkTheme: string;
-  /** 라이트 모드일 때 사용할 색상 테마 id */
+  /** 라이트 모드일 때 에디터·앱에 사용할 색상 테마 id */
   lightTheme: string;
+  /** 다크 모드일 때 터미널에 사용할 색상 테마 id (에디터와 별개) */
+  terminalDarkTheme: string;
+  /** 라이트 모드일 때 터미널에 사용할 색상 테마 id (에디터와 별개) */
+  terminalLightTheme: string;
   /** Monaco 미니맵(코드 미리보기) 표시 여부 */
   minimapEnabled: boolean;
 }
@@ -45,11 +52,15 @@ const DEFAULTS: Settings = {
   uiFontSize: 13,
   editorFontFamily: DEFAULT_MONO_FONT,
   editorFontSize: 14,
+  terminalFontFamily: DEFAULT_MONO_FONT,
+  terminalFontSize: 14,
   logLevelFilter: 'all',
   theme: 'dark',
   themeOverrides: {},
   darkTheme: 'vscode-dark',
   lightTheme: 'vscode-light',
+  terminalDarkTheme: 'vscode-dark',
+  terminalLightTheme: 'vscode-light',
   minimapEnabled: true,
 };
 
