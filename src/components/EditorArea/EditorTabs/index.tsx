@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Copy, Map as MapIcon, Save, SplitSquareHorizontal, SplitSquareVertical, X } from 'lucide-react';
+import {
+  Code2,
+  Copy,
+  Eye,
+  Map as MapIcon,
+  Save,
+  SplitSquareHorizontal,
+  SplitSquareVertical,
+  X,
+} from 'lucide-react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import { useEditorStore, type EditorGroup } from '../../../stores/editorStore';
 import { useSettingsStore } from '../../../stores/settingsStore';
@@ -17,6 +26,7 @@ export default function EditorTabs({ group, groupCount }: { group: EditorGroup; 
   const saveTab = useEditorStore((s) => s.saveTab);
   const moveTab = useEditorStore((s) => s.moveTab);
   const splitActive = useEditorStore((s) => s.splitActive);
+  const togglePreview = useEditorStore((s) => s.togglePreview);
   const closeGroup = useEditorStore((s) => s.closeGroup);
   const setDraggingTab = useEditorStore((s) => s.setDraggingTab);
   const minimapEnabled = useSettingsStore((s) => s.minimapEnabled);
@@ -82,6 +92,8 @@ export default function EditorTabs({ group, groupCount }: { group: EditorGroup; 
   }
 
   const lastIdx = group.tabIds.length - 1;
+  const activeTab = group.activeTabId ? tabsById[group.activeTabId] : undefined;
+  const isMarkdown = activeTab?.language === 'markdown';
 
   return (
     <div className={styles.bar}>
@@ -210,6 +222,15 @@ export default function EditorTabs({ group, groupCount }: { group: EditorGroup; 
       </div>
 
       <div className={styles.actions}>
+        {isMarkdown && (
+          <button
+            className={styles.actionBtn}
+            onClick={() => togglePreview(activeTab!.id)}
+            title={activeTab!.previewMode ? '코드로 보기' : '미리보기'}
+          >
+            {activeTab!.previewMode ? <Code2 size={15} /> : <Eye size={15} />}
+          </button>
+        )}
         <button
           className={styles.actionBtn}
           onClick={() => splitActive('horizontal')}

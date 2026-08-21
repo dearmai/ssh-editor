@@ -75,6 +75,8 @@ export interface EditorTab {
   seenMtime?: number;
   /** 자동 줄바꿈 (파일별 설정, 기본 off) */
   wordWrap?: boolean;
+  /** 마크다운 미리보기 모드 (.md 파일에서만 사용, 기본 off) */
+  previewMode?: boolean;
 }
 
 export interface TerminalSessionInfo {

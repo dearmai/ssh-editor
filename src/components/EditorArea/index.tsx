@@ -2,6 +2,7 @@ import { Allotment } from 'allotment';
 import { useEffect, useState } from 'react';
 import { nodeKey, useEditorStore, type DropSide, type LayoutNode } from '../../stores/editorStore';
 import EditorTabs from './EditorTabs';
+import MarkdownPreview from './MarkdownPreview';
 import MonacoPane from './MonacoPane';
 import WelcomeScreen from './WelcomeScreen';
 import styles from './EditorArea.module.css';
@@ -32,6 +33,9 @@ function zoneFromBody(e: React.DragEvent): Zone | null {
 function GroupView({ groupId }: { groupId: string }) {
   const group = useEditorStore((s) => s.groupsById[groupId]);
   const groupCount = useEditorStore((s) => Object.keys(s.groupsById).length);
+  const activeTab = useEditorStore((s) =>
+    group?.activeTabId ? s.tabsById[group.activeTabId] : undefined
+  );
   const isActiveGroup = useEditorStore((s) => s.activeGroupId === groupId);
   const setActiveGroup = useEditorStore((s) => s.setActiveGroup);
   const moveTab = useEditorStore((s) => s.moveTab);
@@ -77,7 +81,11 @@ function GroupView({ groupId }: { groupId: string }) {
       {isActiveGroup && groupCount > 1 && <div className={styles.activeStrip} />}
       <EditorTabs group={group} groupCount={groupCount} />
       {group.activeTabId ? (
-        <MonacoPane key={`${groupId}:${group.activeTabId}`} tabId={group.activeTabId} />
+        activeTab?.language === 'markdown' && activeTab.previewMode ? (
+          <MarkdownPreview key={`${groupId}:${group.activeTabId}:preview`} tabId={group.activeTabId} />
+        ) : (
+          <MonacoPane key={`${groupId}:${group.activeTabId}`} tabId={group.activeTabId} />
+        )
       ) : groupCount > 1 ? (
         <div className={styles.emptyPane}>
           {isActiveGroup

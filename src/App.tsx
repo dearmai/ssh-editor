@@ -57,6 +57,15 @@ export default function App() {
   const conn = activeConnections.find((c) => c.sessionId === selectedSessionId);
   const profileId = conn?.profile.id;
   const folderPath = selectedSessionId ? rootPaths.get(selectedSessionId) : undefined;
+  const profileName = conn?.profile.name;
+
+  // 타이틀바에 현재 선택된 서버 이름 표시 (창마다 독립적)
+  useEffect(() => {
+    const title = profileName ? `${profileName} — SSH Editor` : 'SSH Editor';
+    getCurrentWindow()
+      .setTitle(title)
+      .catch((err) => log.warn(`타이틀 변경 실패: ${err}`));
+  }, [profileName]);
 
   // 초기 로드 + 메뉴 이벤트
   useEffect(() => {

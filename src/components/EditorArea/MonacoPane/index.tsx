@@ -87,6 +87,8 @@ export default function MonacoPane({ tabId }: Props) {
           fontSize: editorFontSize,
           fontFamily: editorFontFamily,
           lineNumbers: 'on',
+          // 복사 시 문법 강조(색상) HTML을 함께 담지 않고 순수 텍스트만 클립보드에 넣는다
+          copyWithSyntaxHighlighting: false,
           // 탭 드래그를 .pane이 받도록 Monaco 자체 드롭/드래그 처리 비활성화
           // (켜져 있으면 드롭한 탭의 텍스트가 에디터에 삽입되거나 드롭이 가로채여짐)
           dragAndDrop: false,

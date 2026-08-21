@@ -136,26 +136,26 @@ export const useFileTreeStore = create<FileTreeStore>((set, get) => ({
   },
 
   refreshDir: async (connectionId, path) => {
-    // 캐시 무효화 후 재로딩
-    set((state) => {
-      const cache = new Map(state.treeCache);
-      cache.get(connectionId)?.delete(path);
-      return { treeCache: cache };
-    });
-    await get().loadDir(connectionId, path);
+    // 미리 캐시를 비우지 않는다 — 비우면 children 이 잠깐 undefined 가 되어
+    // "로딩 중"으로 바뀌었다가 다시 채워지며 깜빡인다. 새 목록을 받아온 뒤에만 교체.
+    try {
+      const entries = await sftpListDir(connectionId, path);
+      set((state) => {
+        const cache = new Map(state.treeCache);
+        if (!cache.has(connectionId)) cache.set(connectionId, new Map());
+        cache.get(connectionId)!.set(path, entries);
+        return { treeCache: cache };
+      });
+    } catch {
+      // 백그라운드 새로고침 실패는 조용히 무시 (기존 목록 유지)
+    }
   },
 
   refreshConnection: async (connectionId) => {
     const cached = get().treeCache.get(connectionId);
     const paths = cached ? Array.from(cached.keys()) : [];
-    // 캐시 초기화
-    set((state) => {
-      const cache = new Map(state.treeCache);
-      cache.set(connectionId, new Map());
-      return { treeCache: cache };
-    });
-    // 열려있던 모든 경로를 다시 로드 (개별 실패는 무시)
-    await Promise.all(paths.map((p) => get().loadDir(connectionId, p).catch(() => {})));
+    // 열려있던 모든 경로를 새로 받아와 교체 (개별 실패는 무시, 깜빡임 방지는 refreshDir 참고)
+    await Promise.all(paths.map((p) => get().refreshDir(connectionId, p)));
   },
 
   setRootPath: (connectionId, path) => {

@@ -34,6 +34,7 @@ import { useEditorStore } from '../../../stores/editorStore';
 import { useFileTreeStore } from '../../../stores/fileTreeStore';
 import { useTransferStore } from '../../../stores/transferStore';
 import type { ConnectionProfile, FileEntry } from '../../../types';
+import { fileIconFor } from '../../../utils/fileIcon';
 import NewConnectionDialog from '../../Dialogs/NewConnectionDialog';
 import styles from './FileTreePanel.module.css';
 
@@ -660,6 +661,9 @@ function FileTreeItem({
   const expanded = isExpanded(connectionId, entry.path);
   const loading = isLoading(connectionId, entry.path);
   const selected = isSelected(connectionId, entry.path);
+  const { Icon: FileTypeIcon, color: fileIconColor } = entry.isDir
+    ? { Icon: File, color: '' }
+    : fileIconFor(entry.name);
 
   // 드롭 대상 디렉토리: 폴더 행이면 그 폴더, 파일 행이면 파일이 속한 폴더
   const dropTargetDir = entry.isDir ? entry.path : parentDir(entry.path);
@@ -731,7 +735,7 @@ function FileTreeItem({
               {entry.isDir ? (
                 expanded ? <FolderOpen size={14} /> : <Folder size={14} />
               ) : (
-                <File size={14} />
+                <FileTypeIcon size={14} style={{ color: fileIconColor }} />
               )}
             </span>
             <span className={styles.name}>{entry.name}</span>
