@@ -161,9 +161,8 @@ export default function TerminalPane({ sessionId, connectionId: _connectionId, v
   }, [visible, sessionId]);
 
   return (
-    <div
-      ref={containerRef}
-      className={styles.terminal}
-    />
+    <div className={styles.wrapper}>
+      <div ref={containerRef} className={styles.terminal} />
+    </div>
   );
 }

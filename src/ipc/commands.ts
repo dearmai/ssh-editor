@@ -70,6 +70,10 @@ export const sftpDeletePath = (sessionId: string, path: string) =>
 export const sftpRenamePath = (sessionId: string, from: string, to: string) =>
   invoke<void>('sftp_rename_path', { sessionId, from, to });
 
+/** 경로 복사(파일/디렉토리 모두, 재귀) */
+export const sftpCopyPath = (sessionId: string, from: string, to: string) =>
+  invoke<void>('sftp_copy_path', { sessionId, from, to });
+
 export const sftpCreateDir = (sessionId: string, path: string) =>
   invoke<void>('sftp_create_dir', { sessionId, path });
 
@@ -91,13 +95,33 @@ export const sftpUpload = (
   transferId: string
 ) => invoke<void>('sftp_upload', { sessionId, localPath, remotePath, transferId });
 
-/** 드래그 앤 드롭 업로드 — 웹뷰 File 은 로컬 경로가 없어 base64 bytes 로 전송 */
-export const sftpUploadData = (
+/** 드래그 앤 드롭 업로드(청크) — 대용량 파일을 조각내어 여러 번 호출 */
+export const sftpUploadDataChunk = (
   sessionId: string,
   remotePath: string,
   dataB64: string,
-  transferId: string
-) => invoke<void>('sftp_upload_data', { sessionId, remotePath, dataB64, transferId });
+  transferId: string,
+  offset: number,
+  total: number,
+  isLast: boolean
+) =>
+  invoke<void>('sftp_upload_data_chunk', {
+    sessionId,
+    remotePath,
+    dataB64,
+    transferId,
+    offset,
+    total,
+    isLast,
+  });
+
+/** 취소된 청크 업로드가 원격에 남긴 부분 파일 정리 */
+export const sftpAbortUploadData = (sessionId: string, remotePath: string) =>
+  invoke<void>('sftp_abort_upload_data', { sessionId, remotePath });
+
+/** 진행 중인 전송 취소 요청 */
+export const transferCancel = (transferId: string) =>
+  invoke<void>('transfer_cancel', { transferId });
 
 export const sftpDownload = (
   sessionId: string,

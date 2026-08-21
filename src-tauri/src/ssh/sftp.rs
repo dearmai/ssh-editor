@@ -152,6 +152,21 @@ pub async fn rename_path(session: &SshSession, from: &str, to: &str) -> AppResul
     Ok(())
 }
 
+/// 경로 복사(파일/디렉토리 모두, 재귀). 원격 셸의 `cp -a` 사용 —
+/// SFTP 만으로는 디렉토리 재귀 복사를 클라이언트가 직접 순회해야 해 대용량에서 느림.
+pub async fn copy_path(session: &SshSession, from: &str, to: &str) -> AppResult<()> {
+    let (out, code) = run_command(
+        session,
+        &format!("cp -a {} {}", shell_quote(from), shell_quote(to)),
+    )
+    .await?;
+    if code != 0 {
+        let msg = String::from_utf8_lossy(&out);
+        return Err(AppError::Other(format!("복사 실패: {}", msg.trim())));
+    }
+    Ok(())
+}
+
 /// 경로 존재 여부 (업로드/이동 전 이름 충돌 사전 점검용)
 pub async fn exists(session: &SshSession, path: &str) -> AppResult<bool> {
     let sftp_guard = session.sftp.lock().await;

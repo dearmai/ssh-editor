@@ -1,4 +1,4 @@
-import { CheckCircle2, Download, Loader2, Trash2, Upload, XCircle } from 'lucide-react';
+import { Ban, CheckCircle2, Download, Loader2, Trash2, Upload, X, XCircle } from 'lucide-react';
 import { useTransferStore, type Transfer } from '../../../stores/transferStore';
 import styles from './TransferPane.module.css';
 
@@ -10,6 +10,10 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
 }
 
+function formatSpeed(bytesPerSec: number): string {
+  return `${formatSize(bytesPerSec)}/s`;
+}
+
 function percent(t: Transfer): number {
   if (t.status === 'done') return 100;
   if (t.total <= 0) return 0;
@@ -19,6 +23,7 @@ function percent(t: Transfer): number {
 export default function TransferPane() {
   const transfers = useTransferStore((s) => s.transfers);
   const clearFinished = useTransferStore((s) => s.clearFinished);
+  const cancel = useTransferStore((s) => s.cancel);
 
   const ordered = [...transfers].reverse();
 
@@ -47,6 +52,8 @@ export default function TransferPane() {
                     <CheckCircle2 size={13} className={styles.done} />
                   ) : t.status === 'error' ? (
                     <XCircle size={13} className={styles.error} />
+                  ) : t.status === 'canceled' ? (
+                    <Ban size={13} className={styles.canceled} />
                   ) : t.kind === 'upload' ? (
                     <Upload size={13} />
                   ) : (
@@ -59,14 +66,19 @@ export default function TransferPane() {
                     <span className={styles.name} title={t.kind === 'upload' ? t.localPath : t.remotePath}>
                       {t.name}
                     </span>
+                    {t.status === 'active' && t.speed > 0 && (
+                      <span className={styles.speed}>{formatSpeed(t.speed)}</span>
+                    )}
                     <span className={styles.meta}>
                       {t.status === 'error'
                         ? '실패'
-                        : t.status === 'queued'
-                          ? '대기'
-                          : t.total > 0
-                            ? `${formatSize(t.transferred)} / ${formatSize(t.total)}`
-                            : formatSize(t.transferred)}
+                        : t.status === 'canceled'
+                          ? '취소됨'
+                          : t.status === 'queued'
+                            ? '대기'
+                            : t.total > 0
+                              ? `${formatSize(t.transferred)} / ${formatSize(t.total)}`
+                              : formatSize(t.transferred)}
                     </span>
                   </div>
                   <div className={styles.barTrack}>
@@ -84,6 +96,15 @@ export default function TransferPane() {
                   )}
                 </div>
                 <span className={styles.pct}>{t.status === 'active' && !indeterminate ? `${p}%` : ''}</span>
+                {(t.status === 'active' || t.status === 'queued') && (
+                  <button
+                    className={styles.cancelBtn}
+                    title="전송 취소"
+                    onClick={() => cancel(t.id)}
+                  >
+                    <X size={12} />
+                  </button>
+                )}
               </div>
             );
           })

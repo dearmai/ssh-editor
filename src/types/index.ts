@@ -55,8 +55,9 @@ export interface TransferProgressEvent {
   id: string;
   transferred: number;
   total: number;
-  status: 'active' | 'done' | 'error';
+  status: 'active' | 'done' | 'canceled' | 'error';
   error?: string;
+  speed: number; // 바이트/초
 }
 
 export interface EditorTab {

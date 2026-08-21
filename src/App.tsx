@@ -33,6 +33,12 @@ import { log } from './stores/logStore';
 import type { PingInfo } from './types';
 import styles from './App.module.css';
 
+/** 현재 선택된 세션의 파일 트리를 서버 기준으로 새로고침 (열려있던 경로만) */
+function refreshVisibleFileTree() {
+  const selected = useConnectionStore.getState().selectedSessionId;
+  if (selected) useFileTreeStore.getState().refreshConnection(selected).catch(() => {});
+}
+
 export default function App() {
   const { loadAll, selectedSessionId, activeConnections } = useConnectionStore();
   const rootPaths = useFileTreeStore((s) => s.rootPaths);
@@ -81,6 +87,8 @@ export default function App() {
       useConnectionStore.getState().checkConnections();
       // 열린 파일의 서버 측 외부 변경도 함께 검사
       useEditorStore.getState().checkVisibleExternalChanges();
+      // 현재 보이는 파일 트리도 서버 쪽 변경사항(새 파일/삭제 등)이 있는지 새로고침
+      refreshVisibleFileTree();
     };
     window.addEventListener('focus', maybeCheck);
     document.addEventListener('visibilitychange', maybeCheck);
@@ -99,6 +107,15 @@ export default function App() {
       document.removeEventListener('visibilitychange', maybeCheck);
       unlistenFocus?.();
     };
+  }, []);
+
+  // 창이 계속 포커스 상태여도 5초마다 파일 트리를 서버 기준으로 새로고침
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
+      refreshVisibleFileTree();
+    }, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   // Cmd/Ctrl+W: 활성 탭 닫기 → 열린 탭이 하나도 없으면 창 닫기

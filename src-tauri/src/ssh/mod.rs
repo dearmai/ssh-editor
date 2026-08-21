@@ -6,4 +6,4 @@ pub mod transfer;
 pub use connection::*;
 pub use sftp::{FileEntry, FileStat};
 pub use terminal::*;
-pub use transfer::ProbeResult;
+pub use transfer::{ProbeResult, TransferCancelState};

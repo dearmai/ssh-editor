@@ -2,8 +2,11 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  Clipboard,
+  Copy,
   File,
   FilePlus,
+  Files,
   Folder,
   FolderOpen,
   FolderPlus,
@@ -151,8 +154,18 @@ async function handleTreeDrop(e: DragEvent, connectionId: string, targetDir: str
 
 export default function FileTreePanel() {
   const { selectedSessionId, activeConnections, saveActiveDirectories } = useConnectionStore();
-  const { rootPaths, loadDir, setRootPath, createFile, createDir, refreshConnection, dropDir, setDropDir } =
-    useFileTreeStore();
+  const {
+    rootPaths,
+    loadDir,
+    setRootPath,
+    createFile,
+    createDir,
+    refreshConnection,
+    dropDir,
+    setDropDir,
+    clipboard,
+    pasteInto,
+  } = useFileTreeStore();
   const [editingPath, setEditingPath] = useState(false);
 
   const conn = activeConnections.find((c) => c.sessionId === selectedSessionId);
@@ -304,6 +317,13 @@ export default function FileTreePanel() {
               }}
             >
               <FolderPlus size={12} /> 새 폴더
+            </ContextMenu.Item>
+            <ContextMenu.Item
+              className={styles.contextItem}
+              disabled={!clipboard || clipboard.connectionId !== selectedSessionId}
+              onSelect={() => pasteInto(selectedSessionId, rootPath)}
+            >
+              <Clipboard size={12} /> 붙여넣기
             </ContextMenu.Item>
             <ContextMenu.Separator className={styles.separator} />
             <ContextMenu.Item
@@ -510,8 +530,22 @@ function FileTreeNode({
   depth?: number;
   isRoot?: boolean;
 }) {
-  const { getChildren, isExpanded, isLoading, loadDir, toggleExpand, refreshDir, createFile, createDir, deletePath, renamePath } =
-    useFileTreeStore();
+  const {
+    getChildren,
+    isExpanded,
+    isLoading,
+    loadDir,
+    toggleExpand,
+    refreshDir,
+    createFile,
+    createDir,
+    deletePath,
+    renamePath,
+    clipboard,
+    setClipboard,
+    pasteInto,
+    duplicatePath,
+  } = useFileTreeStore();
   const { openFile } = useEditorStore();
 
   const children = getChildren(connectionId, path);
@@ -552,6 +586,12 @@ function FileTreeNode({
             onRefresh={() => refreshDir(connectionId, entry.path)}
             onCreateFile={async (name) => createFile(connectionId, joinPath(targetDir, name))}
             onCreateDir={async (name) => createDir(connectionId, joinPath(targetDir, name))}
+            canPaste={!!clipboard && clipboard.connectionId === connectionId}
+            onCopy={() =>
+              setClipboard({ connectionId, path: entry.path, name: entry.name, isDir: entry.isDir })
+            }
+            onPaste={() => pasteInto(connectionId, entry.path)}
+            onDuplicate={() => duplicatePath(connectionId, entry.path, entry.isDir)}
             onRename={async () => {
               const newName = await promptText({
                 title: '이름 변경',
@@ -593,6 +633,10 @@ function FileTreeItem({
   onRefresh,
   onCreateFile,
   onCreateDir,
+  canPaste,
+  onCopy,
+  onPaste,
+  onDuplicate,
   onRename,
   onDelete,
 }: {
@@ -604,6 +648,10 @@ function FileTreeItem({
   onRefresh: () => void;
   onCreateFile: (name: string) => Promise<void>;
   onCreateDir: (name: string) => Promise<void>;
+  canPaste: boolean;
+  onCopy: () => void;
+  onPaste: () => void;
+  onDuplicate: () => void;
   onRename: () => void;
   onDelete: () => void;
 }) {
@@ -724,6 +772,19 @@ function FileTreeItem({
               <RefreshCw size={12} /> 새로 고침
             </ContextMenu.Item>
           )}
+          <ContextMenu.Separator className={styles.separator} />
+
+          <ContextMenu.Item className={styles.contextItem} onSelect={onCopy}>
+            <Copy size={12} /> 복사
+          </ContextMenu.Item>
+          {entry.isDir && (
+            <ContextMenu.Item className={styles.contextItem} disabled={!canPaste} onSelect={onPaste}>
+              <Clipboard size={12} /> 붙여넣기
+            </ContextMenu.Item>
+          )}
+          <ContextMenu.Item className={styles.contextItem} onSelect={onDuplicate}>
+            <Files size={12} /> 복제
+          </ContextMenu.Item>
           <ContextMenu.Separator className={styles.separator} />
 
           {/* 다운로드 */}

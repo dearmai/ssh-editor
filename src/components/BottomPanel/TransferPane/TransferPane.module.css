@@ -70,6 +70,7 @@
 }
 .done { color: #4ec9b0; }
 .error { color: #f48771; }
+.canceled { color: var(--text-muted); }
 
 .spin {
   animation: spin 1s linear infinite;
@@ -113,6 +114,12 @@
   flex-shrink: 0;
 }
 
+.speed {
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
 .barTrack {
   height: 4px;
   background: var(--bg-active);
@@ -151,4 +158,20 @@
   flex-shrink: 0;
   width: 34px;
   text-align: right;
+}
+
+.cancelBtn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--text-muted);
+  border-radius: 3px;
+  margin-top: 1px;
+}
+.cancelBtn:hover {
+  background: var(--bg-active);
+  color: #f48771;
 }

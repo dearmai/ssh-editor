@@ -1,9 +1,28 @@
 import { create } from 'zustand';
-import { sftpCreateDir, sftpCreateFile, sftpDeletePath, sftpListDir, sftpRenamePath } from '../ipc/commands';
+import {
+  sftpCopyPath,
+  sftpCreateDir,
+  sftpCreateFile,
+  sftpDeletePath,
+  sftpExists,
+  sftpListDir,
+  sftpRenamePath,
+} from '../ipc/commands';
 import type { FileEntry } from '../types';
 
 type ConnectionId = string;
 type Path = string;
+
+function joinPath(dir: string, name: string): string {
+  return dir.endsWith('/') ? `${dir}${name}` : `${dir}/${name}`;
+}
+
+/** 파일명을 stem/확장자로 분리 (디렉토리는 확장자 없이 통째로 다룸) */
+function splitExt(name: string, isDir: boolean): [string, string] {
+  if (isDir) return [name, ''];
+  const i = name.lastIndexOf('.');
+  return i > 0 ? [name.slice(0, i), name.slice(i)] : [name, ''];
+}
 
 interface FileTreeStore {
   // connectionId → path → 자식 목록
@@ -24,6 +43,10 @@ interface FileTreeStore {
   setDragging: (d: { connectionId: string; entry: FileEntry } | null) => void;
   setDropDir: (path: Path | null) => void;
 
+  // 복사/붙여넣기 클립보드 (연결을 넘나드는 복사는 지원하지 않음)
+  clipboard: { connectionId: string; path: string; name: string; isDir: boolean } | null;
+  setClipboard: (c: { connectionId: string; path: string; name: string; isDir: boolean } | null) => void;
+
   loadDir: (connectionId: string, path: string) => Promise<FileEntry[]>;
   toggleExpand: (connectionId: string, path: string) => void;
   refreshDir: (connectionId: string, path: string) => Promise<void>;
@@ -43,6 +66,12 @@ interface FileTreeStore {
   renamePath: (connectionId: string, from: string, to: string) => Promise<void>;
   /** from 을 toDir 디렉토리 안으로 이동 (이름 유지). 원본·대상 디렉토리를 모두 새로 고침 */
   movePath: (connectionId: string, from: string, toDir: string) => Promise<void>;
+  /** from 을 to 로 복사(재귀) */
+  copyPath: (connectionId: string, from: string, to: string) => Promise<void>;
+  /** 클립보드에 담긴 항목을 targetDir 안에 붙여넣기 (이름 충돌 시 "사본" 접미사 자동 부여) */
+  pasteInto: (connectionId: string, targetDir: string) => Promise<void>;
+  /** 같은 위치에 복제("사본" 접미사) */
+  duplicatePath: (connectionId: string, path: string, isDir: boolean) => Promise<void>;
 }
 
 export const useFileTreeStore = create<FileTreeStore>((set, get) => ({
@@ -53,9 +82,11 @@ export const useFileTreeStore = create<FileTreeStore>((set, get) => ({
   loadingPaths: new Set(),
   dragging: null,
   dropDir: null,
+  clipboard: null,
 
   setDragging: (d) => set({ dragging: d }),
   setDropDir: (path) => set((s) => (s.dropDir === path ? s : { dropDir: path })),
+  setClipboard: (c) => set({ clipboard: c }),
 
   loadDir: async (connectionId, path) => {
     const cacheKey = `${connectionId}:${path}`;
@@ -191,4 +222,44 @@ export const useFileTreeStore = create<FileTreeStore>((set, get) => ({
     await get().refreshDir(connectionId, fromParent);
     await get().refreshDir(connectionId, toDir);
   },
+
+  copyPath: async (connectionId, from, to) => {
+    await sftpCopyPath(connectionId, from, to);
+    const parentPath = to.split('/').slice(0, -1).join('/') || '/';
+    await get().refreshDir(connectionId, parentPath);
+  },
+
+  pasteInto: async (connectionId, targetDir) => {
+    const clip = get().clipboard;
+    if (!clip || clip.connectionId !== connectionId) return;
+    const name = await uniqueName(connectionId, targetDir, clip.name, clip.isDir);
+    await get().copyPath(connectionId, clip.path, joinPath(targetDir, name));
+  },
+
+  duplicatePath: async (connectionId, path, isDir) => {
+    const dir = path.split('/').slice(0, -1).join('/') || '/';
+    const name = path.split('/').pop() ?? path;
+    const newName = await uniqueName(connectionId, dir, name, isDir);
+    await get().copyPath(connectionId, path, joinPath(dir, newName));
+  },
 }));
+
+/** dir 안에서 name 과 충돌하지 않는 이름을 찾는다. 충돌 시 "사본"/"사본 N" 접미사를 붙인다. */
+async function uniqueName(
+  connectionId: string,
+  dir: string,
+  name: string,
+  isDir: boolean
+): Promise<string> {
+  const taken = (n: string) => sftpExists(connectionId, joinPath(dir, n)).catch(() => false);
+  if (!(await taken(name))) return name;
+
+  const [stem, ext] = splitExt(name, isDir);
+  let candidate = `${stem} 사본${ext}`;
+  let i = 2;
+  while (await taken(candidate)) {
+    candidate = `${stem} 사본 ${i}${ext}`;
+    i++;
+  }
+  return candidate;
+}

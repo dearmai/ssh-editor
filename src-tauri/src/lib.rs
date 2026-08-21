@@ -29,6 +29,7 @@ pub fn run(startup_args: Option<StartupArgs>) {
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(SshConnectionPool::new())
         .manage(TerminalPool::new())
+        .manage(ssh::TransferCancelState::new())
         .manage(StartupArgsState(Mutex::new(startup_args)))
         .setup(|app| {
             let prefs_item = MenuItemBuilder::with_id("preferences", "환경설정...")
@@ -140,12 +141,15 @@ pub fn run(startup_args: Option<StartupArgs>) {
             sftp_create_file,
             sftp_delete_path,
             sftp_rename_path,
+            sftp_copy_path,
             sftp_create_dir,
             sftp_probe,
             sftp_exists,
             sftp_check_write_access,
             sftp_upload,
-            sftp_upload_data,
+            sftp_upload_data_chunk,
+            sftp_abort_upload_data,
+            transfer_cancel,
             sftp_download,
             sftp_download_dir,
             // 터미널
