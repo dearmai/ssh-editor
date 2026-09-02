@@ -1,0 +1,72 @@
+.panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+  overflow: hidden;
+}
+
+/* 우측 도킹일 때만 보이는 패널 타이틀바 */
+.header {
+  height: 35px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px 0 2px;
+  flex-shrink: 0;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+}
+
+.title {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dockHandle {
+  width: 20px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  color: var(--text-muted);
+  cursor: grab;
+  flex-shrink: 0;
+}
+.dockHandle:hover { background: var(--bg-hover); color: var(--text-primary); }
+.dockHandle:active { cursor: grabbing; }
+
+.actionBtn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+.actionBtn:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+/* 좌 = 분할 영역(TerminalGrid), 우 = 탭 사이드바(VSCode식) */
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+}

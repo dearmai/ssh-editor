@@ -1,13 +1,28 @@
-import { Moon, Plus, SplitSquareHorizontal, Sun, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import {
+  Moon,
+  Plus,
+  SplitSquareHorizontal,
+  SplitSquareVertical,
+  Sun,
+  X,
+} from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { confirm } from '../../../stores/confirmStore';
 import { useConnectionStore } from '../../../stores/connectionStore';
 import { useSettingsStore } from '../../../stores/settingsStore';
-import { useTerminalStore } from '../../../stores/terminalStore';
+import {
+  collectTermIds,
+  parentDirection,
+  useTerminalStore,
+  type TermDropSide,
+} from '../../../stores/terminalStore';
 import styles from './TerminalSidebar.module.css';
 
-/** VSCode식 터미널 탭 사이드바 (우측). 분할 그룹별로 묶어 세로 목록으로 관리 */
-export default function TerminalSidebar() {
+/**
+ * VSCode식 터미널 탭 사이드바 (우측). 분할 그룹별로 묶어 세로 목록으로 관리.
+ * compact = 상위 패널에 이미 "터미널" 타이틀바가 있는 경우(우측 도킹) 라벨만 줄인다.
+ */
+export default function TerminalSidebar({ compact = false }: { compact?: boolean }) {
   const sessions = useTerminalStore((s) => s.sessions);
   const groups = useTerminalStore((s) => s.groups);
   const activeGroupId = useTerminalStore((s) => s.activeGroupId);
@@ -17,13 +32,18 @@ export default function TerminalSidebar() {
   const splitNewTerminal = useTerminalStore((s) => s.splitNewTerminal);
   const splitTerminal = useTerminalStore((s) => s.splitTerminal);
   const closeSession = useTerminalStore((s) => s.closeSession);
+  const renameTerminal = useTerminalStore((s) => s.renameTerminal);
   const setTerminalTheme = useTerminalStore((s) => s.setTerminalTheme);
   const setDraggingTerminal = useTerminalStore((s) => s.setDraggingTerminal);
   const selectedSessionId = useConnectionStore((s) => s.selectedSessionId);
   const resolvedTheme = useSettingsStore((s) => s.resolvedTheme);
 
-  // 사이드바 내 드래그 재배치 시 삽입 위치 (left=위/앞, right=아래/뒤)
-  const [dropAt, setDropAt] = useState<{ id: string; side: 'left' | 'right' } | null>(null);
+  // 사이드바 내 드래그 재배치 시 삽입 위치 (before=위/앞, after=아래/뒤)
+  const [dropAt, setDropAt] = useState<{ id: string; before: boolean } | null>(null);
+  // 이름 변경 중인 터미널
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const clear = () => setDropAt(null);
@@ -35,13 +55,35 @@ export default function TerminalSidebar() {
     };
   }, []);
 
+  useEffect(() => {
+    if (editingId) inputRef.current?.select();
+  }, [editingId]);
+
   const titleOf = (id: string) => sessions.find((s) => s.id === id)?.title ?? id;
   const activeTerminal = sessions.find((s) => s.id === activeSessionId);
   const activeTheme = activeTerminal?.theme ?? resolvedTheme;
 
-  const sideForRow = (e: React.DragEvent, el: HTMLElement): 'left' | 'right' => {
+  const isBefore = (e: React.DragEvent, el: HTMLElement): boolean => {
     const r = el.getBoundingClientRect();
-    return e.clientY - r.top < r.height / 2 ? 'left' : 'right';
+    return e.clientY - r.top < r.height / 2;
+  };
+
+  /** 목록에서의 삽입 위치 → 대상이 속한 분할 방향에 맞는 드롭 side */
+  const sideForTarget = (targetId: string, before: boolean): TermDropSide => {
+    const g = groups.find((x) => collectTermIds(x.root).includes(targetId));
+    const dir = g ? parentDirection(g.root, targetId) : null;
+    if (dir === 'vertical') return before ? 'top' : 'bottom';
+    return before ? 'left' : 'right';
+  };
+
+  const startRename = (id: string) => {
+    setEditingId(id);
+    setDraft(titleOf(id));
+  };
+
+  const commitRename = () => {
+    if (editingId) renameTerminal(editingId, draft);
+    setEditingId(null);
   };
 
   const handleClose = async (id: string) => {
@@ -57,7 +99,7 @@ export default function TerminalSidebar() {
   return (
     <div className={styles.sidebar}>
       <div className={styles.head}>
-        <span className={styles.headTitle}>터미널</span>
+        <span className={styles.headTitle}>{compact ? '목록' : '터미널'}</span>
         <div className={styles.headActions}>
           {activeTerminal && (
             <button
@@ -74,9 +116,17 @@ export default function TerminalSidebar() {
             className={styles.iconBtn}
             onClick={() => activeSessionId && splitNewTerminal(activeSessionId, 'right')}
             disabled={!activeSessionId}
-            title="가로 분할 (옆에 새 터미널)"
+            title="좌우 분할 (옆에 새 터미널)"
           >
             <SplitSquareHorizontal size={13} />
+          </button>
+          <button
+            className={styles.iconBtn}
+            onClick={() => activeSessionId && splitNewTerminal(activeSessionId, 'bottom')}
+            disabled={!activeSessionId}
+            title="상하 분할 (아래에 새 터미널)"
+          >
+            <SplitSquareVertical size={13} />
           </button>
           <button
             className={styles.iconBtn}
@@ -92,8 +142,9 @@ export default function TerminalSidebar() {
       <div className={styles.list}>
         {sessions.length === 0 && <div className={styles.empty}>터미널 없음</div>}
         {groups.map((group) => {
+          const ids = collectTermIds(group.root);
           const isActiveGroup = group.id === activeGroupId;
-          const split = group.terminalIds.length > 1;
+          const split = ids.length > 1;
           return (
             <div
               key={group.id}
@@ -101,17 +152,18 @@ export default function TerminalSidebar() {
                 isActiveGroup ? styles.activeGroup : ''
               }`}
             >
-              {group.terminalIds.map((id) => {
+              {ids.map((id) => {
                 const focused = id === activeSessionId;
-                const dropBefore = dropAt?.id === id && dropAt.side === 'left';
-                const dropAfter = dropAt?.id === id && dropAt.side === 'right';
+                const dropBefore = dropAt?.id === id && dropAt.before;
+                const dropAfter = dropAt?.id === id && !dropAt.before;
+                const editing = editingId === id;
                 return (
                   <div
                     key={id}
                     className={`${styles.row} ${split ? styles.rowGrouped : ''} ${
                       focused ? styles.focused : ''
                     } ${dropBefore ? styles.dropBefore : ''} ${dropAfter ? styles.dropAfter : ''}`}
-                    draggable
+                    draggable={!editing}
                     onDragStart={(e) => {
                       // WKWebView 호환: payload는 스토어로, setData는 드래그 개시용
                       e.dataTransfer.setData('text/plain', id);
@@ -132,7 +184,7 @@ export default function TerminalSidebar() {
                         setDropAt(null);
                         return;
                       }
-                      setDropAt({ id, side: sideForRow(e, e.currentTarget) });
+                      setDropAt({ id, before: isBefore(e, e.currentTarget) });
                     }}
                     onDragLeave={(e) => {
                       if (!e.currentTarget.contains(e.relatedTarget as Node)) {
@@ -141,18 +193,40 @@ export default function TerminalSidebar() {
                     }}
                     onDrop={(e) => {
                       const dragId = useTerminalStore.getState().draggingTerminal;
+                      const before = isBefore(e, e.currentTarget);
                       setDropAt(null);
                       if (!dragId) return;
                       e.preventDefault();
                       e.stopPropagation();
-                      const side = sideForRow(e, e.currentTarget);
                       setDraggingTerminal(null);
-                      splitTerminal(dragId, id, side); // 같은 그룹=순서변경, 다른 그룹=이동
+                      // 같은 그룹=순서변경, 다른 그룹=이동
+                      splitTerminal(dragId, id, sideForTarget(id, before));
                     }}
                     onClick={() => focusTerminal(id)}
-                    title={`${titleOf(id)} — 클릭: 표시 / 드래그: 순서변경·그룹 이동`}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      startRename(id);
+                    }}
+                    title={`${titleOf(id)} — 클릭: 표시 / 더블클릭: 이름 변경 / 드래그: 재배치`}
                   >
-                    <span className={styles.rowTitle}>{titleOf(id)}</span>
+                    {editing ? (
+                      <input
+                        ref={inputRef}
+                        className={styles.rename}
+                        value={draft}
+                        autoFocus
+                        onChange={(e) => setDraft(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        onBlur={commitRename}
+                        onKeyDown={(e) => {
+                          e.stopPropagation();
+                          if (e.key === 'Enter') commitRename();
+                          else if (e.key === 'Escape') setEditingId(null);
+                        }}
+                      />
+                    ) : (
+                      <span className={styles.rowTitle}>{titleOf(id)}</span>
+                    )}
                     <button
                       className={styles.rowClose}
                       title="터미널 닫기"

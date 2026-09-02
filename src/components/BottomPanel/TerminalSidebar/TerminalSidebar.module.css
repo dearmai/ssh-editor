@@ -1,5 +1,5 @@
 .sidebar {
-  flex: 0 0 190px;
+  flex: 0 0 172px;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -159,6 +159,21 @@
   white-space: nowrap;
 }
 
+/* 인라인 이름 변경 입력 */
+.rename {
+  flex: 1;
+  min-width: 0;
+  height: 20px;
+  padding: 0 4px;
+  background: var(--bg-primary);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: inherit;
+  user-select: text;
+}
+
 .rowClose {
   width: 18px;
   height: 18px;
@@ -170,7 +185,22 @@
   opacity: 0;
   flex-shrink: 0;
 }
-.row:hover .rowClose {
+.row:hover /* 인라인 이름 변경 입력 */
+.rename {
+  flex: 1;
+  min-width: 0;
+  height: 20px;
+  padding: 0 4px;
+  background: var(--bg-primary);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: inherit;
+  user-select: text;
+}
+
+.rowClose {
   opacity: 0.8;
 }
 .rowClose:hover {

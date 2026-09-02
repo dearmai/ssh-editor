@@ -3,7 +3,6 @@
   display: flex;
   flex-direction: column;
   background: var(--bg-primary);
-  border-top: 1px solid var(--border);
   overflow: hidden;
 }
 
@@ -90,22 +89,24 @@
 .actionBtn:hover:not(:disabled) { background: var(--bg-hover); color: var(--text-primary); }
 .actionBtn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+/* 패널 도킹 위치 드래그 손잡이 */
+.dockHandle {
+  width: 20px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  color: var(--text-muted);
+  cursor: grab;
+}
+.dockHandle:hover { background: var(--bg-hover); color: var(--text-primary); }
+.dockHandle:active { cursor: grabbing; }
+
 .content {
   flex: 1;
   overflow: hidden;
   position: relative;
-}
-
-/* 터미널 뷰: 좌 분할 영역 + 우 탭 사이드바 */
-.terminalView {
-  width: 100%;
-  height: 100%;
-  flex-direction: row;
-}
-.terminalMain {
-  flex: 1;
-  min-width: 0;
-  height: 100%;
 }
 
 /* 터미널 탭의 세션 개수 배지 */

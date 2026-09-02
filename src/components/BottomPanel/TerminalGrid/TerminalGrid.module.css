@@ -1,24 +1,24 @@
 .grid {
+  position: relative;
   width: 100%;
   height: 100%;
-  display: flex;
-  flex-direction: row;
   overflow: hidden;
 }
 
-.col {
-  position: relative;
-  min-width: 0;
+/* 각 분할 패널: 트리에서 계산한 %좌표로 절대 배치 (DOM 위치가 고정돼 xterm 상태가 보존된다) */
+.pane {
+  position: absolute;
+  z-index: 1;
+  /* 내부 z-index(액센트 라인·분리 버튼)가 거터 위로 튀지 않도록 스택 컨텍스트 격리 */
+  isolation: isolate;
   flex-direction: column;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
-  border-right: 1px solid var(--border);
-}
-.col:last-child {
-  border-right: none;
 }
 
-/* 분할 시 활성 열 상단 액센트 라인 */
-.colActive::after {
+/* 분할 시 활성 패널 상단 액센트 라인 */
+.paneActive::after {
   content: '';
   position: absolute;
   top: 0;
@@ -30,20 +30,42 @@
   pointer-events: none;
 }
 
-/* 두 열 경계의 리사이즈 거터 (열 왼쪽 가장자리에 겹침) */
+/* 두 패널 경계의 리사이즈 거터 (히트 영역 9px, 가운데 1px 구분선) */
 .gutter {
   position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 7px;
-  margin-left: -3px;
-  cursor: col-resize;
   z-index: 5;
 }
-.gutter:hover {
+.gutter::after {
+  content: '';
+  position: absolute;
+  background: var(--border);
+}
+.gutter:hover::after {
   background: var(--accent);
-  opacity: 0.35;
+}
+
+.gutterV {
+  width: 9px;
+  margin-left: -4px;
+  cursor: col-resize;
+}
+.gutterV::after {
+  left: 4px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+}
+
+.gutterH {
+  height: 9px;
+  margin-top: -4px;
+  cursor: row-resize;
+}
+.gutterH::after {
+  top: 4px;
+  left: 0;
+  right: 0;
+  height: 1px;
 }
 
 /* 분할 시 각 칸 우상단 hover 분할-닫기 버튼 (캡션 바 없이 깔끔하게) */
@@ -63,7 +85,7 @@
   color: var(--text-secondary);
   opacity: 0;
 }
-.col:hover .unsplit {
+.pane:hover .unsplit {
   opacity: 0.85;
 }
 .unsplit:hover {
@@ -80,23 +102,42 @@
 
 .dropZone {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 50%;
   background: var(--accent);
   opacity: 0.22;
   pointer-events: none;
   z-index: 6;
 }
-.zoneLeft {
+.zone_left {
+  top: 0;
+  bottom: 0;
   left: 0;
+  width: 50%;
 }
-.zoneRight {
+.zone_right {
+  top: 0;
+  bottom: 0;
   right: 0;
+  width: 50%;
+}
+.zone_top {
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 50%;
+}
+.zone_bottom {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 50%;
 }
 
 .empty {
-  margin: auto;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--text-muted);
   font-size: 12px;
 }

@@ -9,6 +9,10 @@ export const DEFAULT_MONO_FONT =
 
 export type ThemeMode = 'dark' | 'light' | 'system';
 export type ResolvedTheme = 'dark' | 'light';
+/** 터미널 패널이 붙는 위치 (로그·전송은 항상 하단) */
+export type TerminalPosition = 'bottom' | 'right';
+/** 하단 패널에서 선택된 탭 */
+export type PanelTab = 'log' | 'transfer' | 'terminal';
 
 export interface Settings {
   /** 기본 UI 폰트 (sans-serif) */
@@ -36,11 +40,26 @@ export interface Settings {
   terminalLightTheme: string;
   /** Monaco 미니맵(코드 미리보기) 표시 여부 */
   minimapEnabled: boolean;
+  /** 터미널 도킹 위치 (하단 탭 / 우측 사이드바) */
+  terminalPosition: TerminalPosition;
+  /** 하단 패널에서 마지막으로 본 탭 */
+  panelTab: PanelTab;
+  /** 좌측 탐색기 폭 (px) */
+  sidebarWidth: number;
+  /** 하단 패널 높이 (px) */
+  panelHeight: number;
+  /** 우측 도킹 시 터미널 패널 폭 (px) */
+  terminalWidth: number;
+  /** 터미널 목록 사이드바 접기 */
+  terminalListCollapsed: boolean;
 }
 
 interface SettingsStore extends Settings {
   /** 현재 창에 실제 적용된 테마 (런타임 전용, 비영속) */
   resolvedTheme: ResolvedTheme;
+  /** 터미널 패널을 드래그로 옮기는 중인지 (런타임 전용, 비영속) */
+  draggingPanel: boolean;
+  setDraggingPanel: (v: boolean) => void;
   set: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
   setThemeOverride: (scopeKey: string, mode: ThemeMode | null) => void;
   setResolvedTheme: (t: ResolvedTheme) => void;
@@ -62,6 +81,12 @@ const DEFAULTS: Settings = {
   terminalDarkTheme: 'vscode-dark',
   terminalLightTheme: 'vscode-light',
   minimapEnabled: true,
+  terminalPosition: 'bottom',
+  panelTab: 'log',
+  sidebarWidth: 240,
+  panelHeight: 220,
+  terminalWidth: 420,
+  terminalListCollapsed: false,
 };
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -69,6 +94,8 @@ export const useSettingsStore = create<SettingsStore>()(
     (set) => ({
       ...DEFAULTS,
       resolvedTheme: 'dark',
+      draggingPanel: false,
+      setDraggingPanel: (v) => set({ draggingPanel: v }),
       set: (key, value) => set({ [key]: value } as Partial<Settings>),
       setThemeOverride: (scopeKey, mode) =>
         set((state) => {
@@ -83,8 +110,16 @@ export const useSettingsStore = create<SettingsStore>()(
     {
       name: 'ssh-editor-settings',
       // resolvedTheme은 런타임 값이므로 영속화 제외
-      partialize: ({ resolvedTheme: _omit, set: _s, setThemeOverride: _o, setResolvedTheme: _r, reset: _rs, ...rest }) =>
-        rest,
+      partialize: ({
+        resolvedTheme: _omit,
+        draggingPanel: _dp,
+        setDraggingPanel: _sdp,
+        set: _s,
+        setThemeOverride: _o,
+        setResolvedTheme: _r,
+        reset: _rs,
+        ...rest
+      }) => rest,
     }
   )
 );

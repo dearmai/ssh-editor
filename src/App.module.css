@@ -6,9 +6,134 @@
   overflow: hidden;
 }
 
+/* 메인 영역: CSS Grid로 [탐색기 | 에디터 | 패널] 배치.
+   패널 도킹 위치가 바뀌어도 각 영역의 DOM 노드는 그대로라 에디터/터미널이 재마운트되지 않는다. */
 .main {
   flex: 1;
+  min-height: 0;
+  position: relative;
+  display: grid;
   overflow: hidden;
+}
+
+.layoutBottom {
+  grid-template-columns: var(--side-w) 5px 1fr;
+  grid-template-rows: 1fr 5px var(--panel-h);
+  grid-template-areas:
+    'side sgut editor'
+    'side sgut pgut'
+    'side sgut panel';
+}
+
+.layoutRight {
+  grid-template-columns: var(--side-w) 5px 1fr 5px var(--term-w);
+  grid-template-rows: 1fr 5px var(--panel-h);
+  grid-template-areas:
+    'side sgut editor tgut term'
+    'side sgut pgut   tgut term'
+    'side sgut panel  tgut term';
+}
+
+.areaSide {
+  grid-area: side;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.areaEditor {
+  grid-area: editor;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.areaPanel {
+  grid-area: panel;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 터미널 본체. 하단 도킹 시 로그/전송 패널 셀에 겹쳐 그려지고(탭 바 아래로 35px 내림),
+   우측 도킹 시 전용 열을 차지한다. 어느 쪽이든 DOM 노드는 동일 → xterm 유지 */
+.areaTerm {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.layoutBottom .areaTerm {
+  grid-area: panel;
+  margin-top: 35px;
+  z-index: 2;
+  background: var(--bg-primary);
+}
+.layoutRight .areaTerm {
+  grid-area: term;
+}
+
+/* 영역 경계 리사이즈 거터 */
+.gutter {
+  background: var(--border);
+  z-index: 3;
+}
+.gutter:hover {
+  background: var(--accent);
+}
+.gutterSide {
+  grid-area: sgut;
+  cursor: col-resize;
+}
+.gutterPanel {
+  grid-area: pgut;
+  cursor: row-resize;
+}
+.gutterTerm {
+  grid-area: tgut;
+  cursor: col-resize;
+}
+.layoutBottom .gutterTerm {
+  display: none;
+}
+
+/* 패널 드래그 중 표시되는 도킹 드롭존 */
+.dockOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+}
+.dockZone {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--border);
+  background: color-mix(in srgb, var(--bg-primary) 70%, transparent);
+  color: var(--text-secondary);
+}
+.dockRight {
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 32%;
+}
+.dockBottom {
+  left: 0;
+  right: 32%;
+  bottom: 0;
+  height: 34%;
+}
+.dockZone.dockCurrent {
+  opacity: 0.55;
+}
+.dockZone.dockHover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 26%, transparent);
+  color: var(--text-primary);
+  opacity: 1;
+}
+.dockLabel {
+  font-size: 12px;
+  font-weight: 600;
+  pointer-events: none;
 }
 
 .statusBar {

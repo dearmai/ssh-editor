@@ -1,12 +1,12 @@
-import { Allotment } from 'allotment';
 import 'allotment/dist/style.css';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Activity, AppWindow, Clock, WrapText } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import BottomPanel from './components/BottomPanel';
 import EditorArea from './components/EditorArea';
 import SidePanel from './components/SidePanel';
+import TerminalPanel from './components/TerminalPanel';
 import SettingsDialog from './components/Dialogs/SettingsDialog';
 import SaveConflictDialog from './components/Dialogs/SaveConflictDialog';
 import OpenFileDialog from './components/Dialogs/OpenFileDialog';
@@ -27,6 +27,7 @@ import {
   applyUiFont,
   effectiveTheme,
   useSettingsStore,
+  type TerminalPosition,
 } from './stores/settingsStore';
 import { applyColorTheme, getTheme } from './themes';
 import { log } from './stores/logStore';
@@ -53,6 +54,46 @@ export default function App() {
   const darkTheme = useSettingsStore((s) => s.darkTheme);
   const lightTheme = useSettingsStore((s) => s.lightTheme);
   const setResolvedTheme = useSettingsStore((s) => s.setResolvedTheme);
+
+  const terminalPosition = useSettingsStore((s) => s.terminalPosition);
+  const panelTab = useSettingsStore((s) => s.panelTab);
+  const sidebarWidth = useSettingsStore((s) => s.sidebarWidth);
+  const panelHeight = useSettingsStore((s) => s.panelHeight);
+  const terminalWidth = useSettingsStore((s) => s.terminalWidth);
+  const draggingPanel = useSettingsStore((s) => s.draggingPanel);
+  const setSetting = useSettingsStore((s) => s.set);
+  const mainRef = useRef<HTMLDivElement>(null);
+
+  // 터미널 본체는 항상 마운트. 우측 도킹이면 항상, 하단이면 터미널 탭일 때만 보인다
+  const terminalVisible = terminalPosition === 'right' || panelTab === 'terminal';
+
+  // 영역 경계 거터 드래그 → px 크기 갱신 (레이아웃은 CSS Grid, DOM은 그대로라 재마운트 없음)
+  const startResize = useCallback(
+    (e: React.PointerEvent, which: 'side' | 'panel' | 'term') => {
+      e.preventDefault();
+      const box = mainRef.current?.getBoundingClientRect();
+      if (!box) return;
+      const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+      const onMove = (ev: PointerEvent) => {
+        if (which === 'side') {
+          setSetting('sidebarWidth', clamp(ev.clientX - box.left, 160, Math.max(200, box.width - 320)));
+        } else if (which === 'panel') {
+          setSetting('panelHeight', clamp(box.bottom - ev.clientY, 80, Math.max(120, box.height - 120)));
+        } else {
+          setSetting('terminalWidth', clamp(box.right - ev.clientX, 300, Math.max(340, box.width - 360)));
+        }
+      };
+      const onUp = () => {
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+        document.body.style.cursor = '';
+      };
+      document.body.style.cursor = which === 'panel' ? 'row-resize' : 'col-resize';
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+    },
+    [setSetting]
+  );
 
   const conn = activeConnections.find((c) => c.sessionId === selectedSessionId);
   const profileId = conn?.profile.id;
@@ -197,22 +238,50 @@ export default function App() {
 
   return (
     <div className={styles.app}>
-      <div className={styles.main}>
-        <Allotment>
-          <Allotment.Pane minSize={160} maxSize={480} preferredSize={240} snap>
-            <SidePanel />
-          </Allotment.Pane>
-          <Allotment.Pane>
-            <Allotment vertical>
-              <Allotment.Pane>
-                <EditorArea />
-              </Allotment.Pane>
-              <Allotment.Pane minSize={80} preferredSize={220}>
-                <BottomPanel />
-              </Allotment.Pane>
-            </Allotment>
-          </Allotment.Pane>
-        </Allotment>
+      <div
+        ref={mainRef}
+        className={`${styles.main} ${
+          terminalPosition === 'right' ? styles.layoutRight : styles.layoutBottom
+        }`}
+        style={
+          {
+            '--side-w': `${sidebarWidth}px`,
+            '--panel-h': `${panelHeight}px`,
+            '--term-w': `${terminalWidth}px`,
+          } as React.CSSProperties
+        }
+      >
+        <div className={styles.areaSide}>
+          <SidePanel />
+        </div>
+        <div
+          className={`${styles.gutter} ${styles.gutterSide}`}
+          onPointerDown={(e) => startResize(e, 'side')}
+          title="탐색기 폭 조절"
+        />
+        <div className={styles.areaEditor}>
+          <EditorArea />
+        </div>
+        <div
+          className={`${styles.gutter} ${styles.gutterPanel}`}
+          onPointerDown={(e) => startResize(e, 'panel')}
+          title="패널 크기 조절"
+        />
+        <div className={styles.areaPanel}>
+          <BottomPanel />
+        </div>
+        <div
+          className={`${styles.gutter} ${styles.gutterTerm}`}
+          onPointerDown={(e) => startResize(e, 'term')}
+          title="터미널 패널 폭 조절"
+        />
+        {/* 터미널 본체 — 하단(패널 영역에 겹침)·우측(전용 열) 어디서도 같은 DOM 노드 */}
+        <div className={styles.areaTerm} style={{ display: terminalVisible ? 'block' : 'none' }}>
+          <TerminalPanel visible={terminalVisible} />
+        </div>
+        {draggingPanel && (
+          <DockZones current={terminalPosition} onDock={(p) => setSetting('terminalPosition', p)} />
+        )}
       </div>
 
       <div className={styles.statusBar}>
@@ -248,6 +317,50 @@ export default function App() {
       <PromptDialog />
       <ReconnectDialog />
       <ExternalChangeDialog />
+    </div>
+  );
+}
+
+/** 터미널 패널 드래그 중 표시되는 도킹 위치 드롭존 (하단 / 우측) */
+function DockZones({
+  current,
+  onDock,
+}: {
+  current: TerminalPosition;
+  onDock: (p: TerminalPosition) => void;
+}) {
+  const [hover, setHover] = useState<TerminalPosition | null>(null);
+
+  const zone = (pos: TerminalPosition, cls: string, label: string) => (
+    <div
+      className={`${styles.dockZone} ${cls} ${hover === pos ? styles.dockHover : ''} ${
+        current === pos ? styles.dockCurrent : ''
+      }`}
+      onDragEnter={(e) => {
+        e.preventDefault();
+        setHover(pos);
+      }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        setHover(pos);
+      }}
+      onDragLeave={() => setHover((h) => (h === pos ? null : h))}
+      onDrop={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setHover(null);
+        onDock(pos);
+      }}
+    >
+      <span className={styles.dockLabel}>{label}</span>
+    </div>
+  );
+
+  return (
+    <div className={styles.dockOverlay}>
+      {zone('right', styles.dockRight, '터미널을 우측에 배치')}
+      {zone('bottom', styles.dockBottom, '터미널을 하단 탭으로')}
     </div>
   );
 }

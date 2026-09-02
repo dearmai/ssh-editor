@@ -7,9 +7,8 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc::{self, UnboundedSender};
 
+/// PTY 채널로 입력을 보내는 핸들. 세션 id는 `TerminalPool.sessions`의 키가 대신한다.
 pub struct TerminalSession {
-    pub id: String,
-    pub connection_id: String,
     pub stdin_tx: UnboundedSender<Vec<u8>>,
 }
 
@@ -83,14 +82,9 @@ pub async fn create_terminal(
         }
     });
 
-    terminal_pool.sessions.insert(
-        terminal_id.clone(),
-        TerminalSession {
-            id: terminal_id.clone(),
-            connection_id: connection_id.to_string(),
-            stdin_tx,
-        },
-    );
+    terminal_pool
+        .sessions
+        .insert(terminal_id.clone(), TerminalSession { stdin_tx });
 
     Ok(terminal_id)
 }
