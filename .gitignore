@@ -35,4 +35,6 @@ pnpm-debug.log*
 !.env.example
 
 # ── 로컬 문서 / 회고록 (커밋 제외) ─────────────
-docs/
+# 디렉토리 자체를 제외하면 하위 파일 예외가 먹지 않으므로 docs/* 로 제외한다
+docs/*
+!docs/windows-build.md
