@@ -1,6 +1,15 @@
 import 'allotment/dist/style.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Activity, AppWindow, Clock, WrapText } from 'lucide-react';
+import {
+  Activity,
+  AppWindow,
+  Clock,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
+  WrapText,
+} from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import BottomPanel from './components/BottomPanel';
@@ -56,6 +65,7 @@ export default function App() {
   const setResolvedTheme = useSettingsStore((s) => s.setResolvedTheme);
 
   const terminalPosition = useSettingsStore((s) => s.terminalPosition);
+  const sidebarVisible = useSettingsStore((s) => s.sidebarVisible);
   const panelTab = useSettingsStore((s) => s.panelTab);
   const sidebarWidth = useSettingsStore((s) => s.sidebarWidth);
   const panelHeight = useSettingsStore((s) => s.panelHeight);
@@ -65,7 +75,8 @@ export default function App() {
   const mainRef = useRef<HTMLDivElement>(null);
 
   // 터미널 본체는 항상 마운트. 우측 도킹이면 항상, 하단이면 터미널 탭일 때만 보인다
-  const terminalVisible = terminalPosition === 'right' || panelTab === 'terminal';
+  const rightOpen = terminalPosition === 'right';
+  const terminalVisible = rightOpen || panelTab === 'terminal';
 
   // 영역 경계 거터 드래그 → px 크기 갱신 (레이아웃은 CSS Grid, DOM은 그대로라 재마운트 없음)
   const startResize = useCallback(
@@ -245,9 +256,11 @@ export default function App() {
         }`}
         style={
           {
-            '--side-w': `${sidebarWidth}px`,
+            '--side-w': sidebarVisible ? `${sidebarWidth}px` : '0px',
+            '--sgut-w': sidebarVisible ? '5px' : '0px',
             '--panel-h': `${panelHeight}px`,
-            '--term-w': `${terminalWidth}px`,
+            '--tgut-w': rightOpen ? '5px' : '0px',
+            '--term-w': rightOpen ? `${terminalWidth}px` : '0px',
           } as React.CSSProperties
         }
       >
@@ -297,6 +310,20 @@ export default function App() {
           <div className={styles.statusRight}>
             <WordWrapStatus />
             <LanguageStatus />
+            <button
+              className={`${styles.statusBtn} ${sidebarVisible ? styles.active : ''}`}
+              onClick={() => setSetting('sidebarVisible', !sidebarVisible)}
+              title={sidebarVisible ? '좌측 탐색기 닫기' : '좌측 탐색기 열기'}
+            >
+              {sidebarVisible ? <PanelLeftClose size={13} /> : <PanelLeftOpen size={13} />}
+            </button>
+            <button
+              className={`${styles.statusBtn} ${rightOpen ? styles.active : ''}`}
+              onClick={() => setSetting('terminalPosition', rightOpen ? 'bottom' : 'right')}
+              title={rightOpen ? '우측 터미널 사이드바 닫기' : '우측 터미널 사이드바 열기'}
+            >
+              {rightOpen ? <PanelRightClose size={13} /> : <PanelRightOpen size={13} />}
+            </button>
             <button
               className={styles.statusBtn}
               onClick={() => openNewWindow().catch((e) => log.error(`새 창 열기 실패: ${e}`))}

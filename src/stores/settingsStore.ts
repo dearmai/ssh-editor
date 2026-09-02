@@ -40,8 +40,10 @@ export interface Settings {
   terminalLightTheme: string;
   /** Monaco 미니맵(코드 미리보기) 표시 여부 */
   minimapEnabled: boolean;
-  /** 터미널 도킹 위치 (하단 탭 / 우측 사이드바) */
+  /** 터미널 도킹 위치 (하단 탭 / 우측 사이드바). 창마다 초기값은 항상 'bottom' — 영속 제외 */
   terminalPosition: TerminalPosition;
+  /** 좌측 탐색기 표시 여부 */
+  sidebarVisible: boolean;
   /** 하단 패널에서 마지막으로 본 탭 */
   panelTab: PanelTab;
   /** 좌측 탐색기 폭 (px) */
@@ -82,6 +84,7 @@ const DEFAULTS: Settings = {
   terminalLightTheme: 'vscode-light',
   minimapEnabled: true,
   terminalPosition: 'bottom',
+  sidebarVisible: true,
   panelTab: 'log',
   sidebarWidth: 240,
   panelHeight: 220,
@@ -109,9 +112,21 @@ export const useSettingsStore = create<SettingsStore>()(
     }),
     {
       name: 'ssh-editor-settings',
-      // resolvedTheme은 런타임 값이므로 영속화 제외
+      version: 1,
+      // v0 저장본에는 terminalPosition(및 구 panelPosition/panelWidth)이 남아 있어
+      // 새 창이 우측 도킹으로 복원되므로 제거한다
+      migrate: (persisted) => {
+        const st = { ...(persisted as Record<string, unknown>) };
+        delete st.terminalPosition;
+        delete st.panelPosition;
+        delete st.panelWidth;
+        return st as unknown as Settings;
+      },
+      // resolvedTheme·draggingPanel은 런타임 값, terminalPosition은 새 창에서 항상
+      // 하단으로 시작해야 하므로 영속화에서 제외한다
       partialize: ({
         resolvedTheme: _omit,
+        terminalPosition: _tp,
         draggingPanel: _dp,
         setDraggingPanel: _sdp,
         set: _s,
