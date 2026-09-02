@@ -35,6 +35,16 @@ if (-not (Test-Tool 'npm' 'npm' '--version' 'Node.js와 함께 설치됨')) { $o
 # 3) NASM (aws-lc-sys 어셈블리 빌드에 필수)
 if (-not (Test-Tool 'NASM' 'nasm' '-v' 'winget install NASM.NASM + PATH 등록')) { $ok = $false }
 
+# 3b) CMake (aws-lc-sys가 CC 빌더 대신 CMake 빌더로 폴백할 때 필수)
+#     항상 필요한 건 아니라 경고만 — 없으면 'Missing dependency: cmake'로 빌드가 멈출 수 있음
+if (Get-Command cmake -ErrorAction SilentlyContinue) {
+    $cmakeVer = ''
+    try { $cmakeVer = (& cmake --version 2>$null | Select-Object -First 1) } catch {}
+    Write-Host ("  [OK]   {0,-18} {1}" -f 'CMake', $cmakeVer) -ForegroundColor Green
+} else {
+    Write-Host ("  [WARN] {0,-18} {1}" -f 'CMake', 'aws-lc-sys가 CMake 빌더로 폴백하면 필수 (winget install Kitware.CMake)') -ForegroundColor Yellow
+}
+
 # 4) MSVC 링커 (link.exe) - VS Build Tools
 $link = Get-Command 'link.exe' -ErrorAction SilentlyContinue
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"

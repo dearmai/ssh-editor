@@ -62,7 +62,10 @@ if (Test-Path $nasmDir) {
     Write-Host "  [WARN] NASM 설치 경로($nasmDir)를 찾지 못함. 설치 후 PATH 수동 등록이 필요할 수 있음." -ForegroundColor Yellow
 }
 
-# 5) npm 의존성
+# 5) CMake (aws-lc-sys가 CMake 빌더로 폴백할 때 필수 — 미리 깔아두면 폴백해도 안전)
+Install-IfMissing 'cmake' 'Kitware.CMake' 'CMake' '--custom ADD_CMAKE_TO_PATH=System'
+
+# 6) npm 의존성
 $root = Split-Path -Parent $PSScriptRoot
 if (Test-Path (Join-Path $root 'package.json')) {
     Write-Host "  [npm] 프론트엔드 의존성 설치 (npm install)..." -ForegroundColor Cyan
