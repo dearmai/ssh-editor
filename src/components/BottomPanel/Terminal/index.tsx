@@ -9,7 +9,7 @@ import { log } from '../../../stores/logStore';
 import { useSettingsStore } from '../../../stores/settingsStore';
 import { useTerminalStore } from '../../../stores/terminalStore';
 import { getTheme } from '../../../themes';
-import { decodeOsc52Base64, writeClipboard } from '../../../utils/clipboard';
+import { decodeOsc52Base64, readClipboard, writeClipboard } from '../../../utils/clipboard';
 import styles from './Terminal.module.css';
 
 interface Props {
@@ -23,6 +23,19 @@ export default function TerminalPane({ sessionId, connectionId: _connectionId, v
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
+  /** 마지막으로 서버에 보낸 크기 — 같은 값 중복 전송 방지 */
+  const lastSizeRef = useRef<{ cols: number; rows: number } | null>(null);
+
+  /** 크기가 실제로 바뀐 경우에만 PTY window-change 전송 */
+  const sendResize = (cols: number, rows: number) => {
+    if (!cols || !rows) return;
+    const last = lastSizeRef.current;
+    if (last && last.cols === cols && last.rows === rows) return;
+    lastSizeRef.current = { cols, rows };
+    terminalResize(sessionId, cols, rows).catch((e) => {
+      log.warn(`터미널 크기 전송 실패: ${String(e)}`);
+    });
+  };
 
   const terminalFontFamily = useSettingsStore((s) => s.terminalFontFamily);
   const terminalFontSize = useSettingsStore((s) => s.terminalFontSize);
@@ -61,6 +74,7 @@ export default function TerminalPane({ sessionId, connectionId: _connectionId, v
 
   useEffect(() => {
     if (!containerRef.current) return;
+    lastSizeRef.current = null;
 
     const term = new Terminal({
       theme: termTheme,
@@ -89,9 +103,10 @@ export default function TerminalPane({ sessionId, connectionId: _connectionId, v
     // OSC 52 — 원격 pbcopy/tmux 등이 보낸 클립보드 쓰기를 로컬 클립보드에 반영
     // 형식: ESC ] 52 ; <selection> ; <base64> BEL
     term.parser.registerOscHandler(52, (data) => {
-      const sep = data.indexOf(';');
+      // Pc(selection)는 'c', 'p', 'cp' 등 여러 글자가 올 수 있으므로 마지막 ';' 기준으로 자른다
+      const sep = data.lastIndexOf(';');
       if (sep < 0) return true;
-      const payload = data.slice(sep + 1);
+      const payload = data.slice(sep + 1).trim();
       // '?'는 클립보드 읽기 요청 → 원격에 로컬 클립보드를 노출하지 않도록 무시
       if (payload === '?') return true;
       // '!' 또는 빈 값은 클립보드 비우기 요청 → 무시
@@ -126,16 +141,54 @@ export default function TerminalPane({ sessionId, connectionId: _connectionId, v
       terminalWrite(sessionId, encoded);
     });
 
-    // 리사이즈
+    // 리사이즈 — 크기가 바뀔 때만 PTY에 window-change 전송
     const observer = new ResizeObserver(() => {
       fitAddon.fit();
-      terminalResize(sessionId, term.cols, term.rows);
+      sendResize(term.cols, term.rows);
     });
     observer.observe(containerRef.current);
+    // xterm이 자체적으로 감지한 크기 변화(폰트 변경 등)도 서버에 반영
+    const offResize = term.onResize(({ cols, rows }) => sendResize(cols, rows));
+
+    // 복사/붙여넣기 — xterm은 자체 선택 모델을 쓰므로 브라우저 기본 복사가 동작하지 않는다.
+    // macOS Cmd+C/V, 그 외 Ctrl+Shift+C/V를 직접 처리하고 셸로는 흘려보내지 않는다.
+    term.attachCustomKeyEventHandler((e) => {
+      if (e.type !== 'keydown') return true;
+      const key = e.key.toLowerCase();
+      const mod = e.metaKey || (e.ctrlKey && e.shiftKey);
+      if (!mod) return true;
+
+      if (key === 'c') {
+        const selection = term.getSelection();
+        // 선택이 없으면 기본 동작(Ctrl+Shift+C 등)에 맡긴다
+        if (!selection) return true;
+        void writeClipboard(selection).catch((err) => {
+          log.error(`클립보드 복사 실패: ${String(err)}`);
+        });
+        e.preventDefault();
+        return false;
+      }
+
+      if (key === 'v') {
+        void readClipboard()
+          .then((text) => {
+            if (!text) return;
+            term.paste(text);
+          })
+          .catch((err) => {
+            log.error(`클립보드 붙여넣기 실패: ${String(err)}`);
+          });
+        e.preventDefault();
+        return false;
+      }
+
+      return true;
+    });
 
     return () => {
       unlistenPromise.then((f) => f());
       observer.disconnect();
+      offResize.dispose();
       term.dispose();
     };
   }, [sessionId]);
@@ -151,7 +204,7 @@ export default function TerminalPane({ sessionId, connectionId: _connectionId, v
       try {
         // 숨김 상태에서 생성돼 폰트 측정이 빗나갔을 수 있으니 표시될 때 재측정
         remeasureFont(term);
-        terminalResize(sessionId, term.cols, term.rows);
+        sendResize(term.cols, term.rows);
         term.scrollToBottom();
       } catch {
         /* 디스포즈 직후 등 — 무시 */

@@ -3,6 +3,7 @@ import {
   ChevronDown,
   ChevronRight,
   Clipboard,
+  ClipboardCopy,
   Copy,
   File,
   FilePlus,
@@ -34,6 +35,8 @@ import { useEditorStore } from '../../../stores/editorStore';
 import { useFileTreeStore } from '../../../stores/fileTreeStore';
 import { useTransferStore } from '../../../stores/transferStore';
 import type { ConnectionProfile, FileEntry } from '../../../types';
+import { writeClipboard } from '../../../utils/clipboard';
+import { pasteClipboardInto } from '../../../utils/clipboardPaste';
 import { fileIconFor } from '../../../utils/fileIcon';
 import NewConnectionDialog from '../../Dialogs/NewConnectionDialog';
 import styles from './FileTreePanel.module.css';
@@ -46,6 +49,15 @@ function joinPath(dir: string, name: string): string {
 /** 경로의 부모 디렉토리 */
 function parentDir(path: string): string {
   return path.split('/').slice(0, -1).join('/') || '/';
+}
+
+/** 선택한 파일은 부모 디렉토리, 폴더는 해당 디렉토리가 붙여넣기 대상이다. */
+function selectedPasteDirectory(connectionId: string, rootPath: string): string {
+  const store = useFileTreeStore.getState();
+  const selected = store.selectedPaths.get(connectionId);
+  if (!selected || selected === rootPath) return rootPath;
+  const entry = store.getChildren(connectionId, parentDir(selected))?.find((entry) => entry.path === selected);
+  return entry ? (entry.isDir ? entry.path : parentDir(entry.path)) : rootPath;
 }
 
 /** 이 드래그를 트리가 받을 수 있는가 — 내부 트리 항목 또는 외부 파일(Finder 등)만 */
@@ -164,8 +176,6 @@ export default function FileTreePanel() {
     refreshConnection,
     dropDir,
     setDropDir,
-    clipboard,
-    pasteInto,
   } = useFileTreeStore();
   const [editingPath, setEditingPath] = useState(false);
 
@@ -275,6 +285,28 @@ export default function FileTreePanel() {
         <ContextMenu.Trigger asChild>
           <div
             className={`${styles.tree} ${dropDir === rootPath ? styles.treeDropActive : ''}`}
+            tabIndex={0}
+            aria-label="서버 파일 목록"
+            onMouseDown={(e) => {
+              if (!(e.target as HTMLElement).closest('[data-paste-dir]')) {
+                e.currentTarget.focus();
+                useFileTreeStore.getState().setSelected(selectedSessionId, rootPath);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey || e.key.toLowerCase() !== 'v') return;
+              if ((e.target as HTMLElement).closest('input, textarea, [contenteditable="true"]')) return;
+              e.preventDefault();
+              e.stopPropagation();
+              void pasteClipboardInto(selectedSessionId, selectedPasteDirectory(selectedSessionId, rootPath));
+            }}
+            onPaste={(e) => {
+              if ((e.target as HTMLElement).closest('input, textarea, [contenteditable="true"]')) return;
+              e.preventDefault();
+              e.stopPropagation();
+              const files = Array.from(e.clipboardData.files);
+              void pasteClipboardInto(selectedSessionId, selectedPasteDirectory(selectedSessionId, rootPath), files);
+            }}
             onDragOver={(e) => {
               if (!canAcceptTreeDrop(e, selectedSessionId)) return;
               if (!isValidMoveTarget(selectedSessionId, rootPath)) {
@@ -321,8 +353,7 @@ export default function FileTreePanel() {
             </ContextMenu.Item>
             <ContextMenu.Item
               className={styles.contextItem}
-              disabled={!clipboard || clipboard.connectionId !== selectedSessionId}
-              onSelect={() => pasteInto(selectedSessionId, rootPath)}
+              onSelect={() => { void pasteClipboardInto(selectedSessionId, rootPath); }}
             >
               <Clipboard size={12} /> 붙여넣기
             </ContextMenu.Item>
@@ -542,9 +573,7 @@ function FileTreeNode({
     createDir,
     deletePath,
     renamePath,
-    clipboard,
     setClipboard,
-    pasteInto,
     duplicatePath,
   } = useFileTreeStore();
   const { openFile } = useEditorStore();
@@ -587,11 +616,12 @@ function FileTreeNode({
             onRefresh={() => refreshDir(connectionId, entry.path)}
             onCreateFile={async (name) => createFile(connectionId, joinPath(targetDir, name))}
             onCreateDir={async (name) => createDir(connectionId, joinPath(targetDir, name))}
-            canPaste={!!clipboard && clipboard.connectionId === connectionId}
-            onCopy={() =>
-              setClipboard({ connectionId, path: entry.path, name: entry.name, isDir: entry.isDir })
-            }
-            onPaste={() => pasteInto(connectionId, entry.path)}
+            onCopy={() => {
+              setClipboard({ connectionId, path: entry.path, name: entry.name, isDir: entry.isDir });
+              // 원격 파일 복사를 선택하면 이전 로컬 이미지/파일 클립보드를 대체한다.
+              void writeClipboard(entry.path);
+            }}
+            onPaste={() => { void pasteClipboardInto(connectionId, targetDir); }}
             onDuplicate={() => duplicatePath(connectionId, entry.path, entry.isDir)}
             onRename={async () => {
               const newName = await promptText({
@@ -625,6 +655,14 @@ function FileTreeNode({
   );
 }
 
+/** rootPath 기준 상대 경로. 루트 밖이면 절대 경로를 그대로 돌려준다. */
+function relativeToRoot(rootPath: string, target: string): string {
+  const base = rootPath.endsWith('/') ? rootPath : `${rootPath}/`;
+  if (target === rootPath) return '.';
+  if (!target.startsWith(base)) return target;
+  return target.slice(base.length);
+}
+
 function FileTreeItem({
   entry,
   connectionId,
@@ -634,7 +672,6 @@ function FileTreeItem({
   onRefresh,
   onCreateFile,
   onCreateDir,
-  canPaste,
   onCopy,
   onPaste,
   onDuplicate,
@@ -649,7 +686,6 @@ function FileTreeItem({
   onRefresh: () => void;
   onCreateFile: (name: string) => Promise<void>;
   onCreateDir: (name: string) => Promise<void>;
-  canPaste: boolean;
   onCopy: () => void;
   onPaste: () => void;
   onDuplicate: () => void;
@@ -658,6 +694,13 @@ function FileTreeItem({
 }) {
   const { isExpanded, isLoading, isSelected, setSelected, dropDir, setDragging, setDropDir } =
     useFileTreeStore();
+  const rootPath = useFileTreeStore((s) => s.rootPaths.get(connectionId)) ?? '/';
+
+  const copyPath = (text: string) => {
+    void writeClipboard(text)
+      .then(() => log.info(`경로 복사: ${text}`))
+      .catch((e) => log.error(`경로 복사 실패: ${String(e)}`));
+  };
   const expanded = isExpanded(connectionId, entry.path);
   const loading = isLoading(connectionId, entry.path);
   const selected = isSelected(connectionId, entry.path);
@@ -690,8 +733,10 @@ function FileTreeItem({
         <div onContextMenu={(e) => e.stopPropagation()}>
           <div
             className={`${styles.item} ${selected ? styles.selected : ''} ${isDropTarget ? styles.dropTarget : ''}`}
+            tabIndex={0}
+            data-paste-dir={dropTargetDir}
             style={{ paddingLeft: depth * 12 + 4 }}
-            onClick={handleClick}
+            onClick={(e) => { e.currentTarget.focus(); handleClick(); }}
             draggable
             onDragStart={(e) => {
               // WKWebView 는 dragover 중 커스텀 dataTransfer 를 노출하지 않으므로 스토어로 전달
@@ -781,13 +826,26 @@ function FileTreeItem({
           <ContextMenu.Item className={styles.contextItem} onSelect={onCopy}>
             <Copy size={12} /> 복사
           </ContextMenu.Item>
-          {entry.isDir && (
-            <ContextMenu.Item className={styles.contextItem} disabled={!canPaste} onSelect={onPaste}>
-              <Clipboard size={12} /> 붙여넣기
-            </ContextMenu.Item>
-          )}
+          <ContextMenu.Item className={styles.contextItem} onSelect={onPaste}>
+            <Clipboard size={12} /> 붙여넣기
+          </ContextMenu.Item>
           <ContextMenu.Item className={styles.contextItem} onSelect={onDuplicate}>
             <Files size={12} /> 복제
+          </ContextMenu.Item>
+          <ContextMenu.Separator className={styles.separator} />
+
+          {/* 경로 복사 — 절대 경로 / base 디렉토리 기준 상대 경로 */}
+          <ContextMenu.Item
+            className={styles.contextItem}
+            onSelect={() => copyPath(entry.path)}
+          >
+            <ClipboardCopy size={12} /> {entry.isDir ? '폴더' : '파일'} 경로 복사
+          </ContextMenu.Item>
+          <ContextMenu.Item
+            className={styles.contextItem}
+            onSelect={() => copyPath(relativeToRoot(rootPath, entry.path))}
+          >
+            <ClipboardCopy size={12} /> {entry.isDir ? '폴더' : '파일'} 상대 경로 복사
           </ContextMenu.Item>
           <ContextMenu.Separator className={styles.separator} />
 

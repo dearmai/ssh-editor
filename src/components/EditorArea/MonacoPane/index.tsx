@@ -1,5 +1,6 @@
 import Editor from '@monaco-editor/react';
 import { useCallback, useEffect, useRef } from 'react';
+import { useIndent } from '../../../hooks/useIndent';
 import { useEditorStore } from '../../../stores/editorStore';
 import { useSettingsStore } from '../../../stores/settingsStore';
 import { defineMonacoThemes, getTheme, monacoThemeName } from '../../../themes';
@@ -21,6 +22,9 @@ export default function MonacoPane({ tabId }: Props) {
   const resolvedTheme = useSettingsStore((s) => s.resolvedTheme);
   const darkTheme = useSettingsStore((s) => s.darkTheme);
   const lightTheme = useSettingsStore((s) => s.lightTheme);
+
+  // 들여쓰기: 파일별 오버라이드 → 확장자 규칙 → 기본값
+  const { rule: indent } = useIndent(tab?.connectionId, tab?.remotePath);
 
   const colorTheme = getTheme(resolvedTheme === 'dark' ? darkTheme : lightTheme, resolvedTheme);
   const monacoTheme = monacoThemeName(colorTheme);
@@ -94,6 +98,10 @@ export default function MonacoPane({ tabId }: Props) {
           dragAndDrop: false,
           dropIntoEditor: { enabled: false },
           minimap: { enabled: minimapEnabled, scale: 1 },
+          // 들여쓰기는 설정에서 결정 — 파일 내용에서 추론하면 설정이 무시된다
+          detectIndentation: false,
+          tabSize: indent.tabSize,
+          insertSpaces: indent.insertSpaces,
           wordWrap: tab.wordWrap ? 'on' : 'off',
           scrollBeyondLastLine: false,
           renderWhitespace: 'selection',

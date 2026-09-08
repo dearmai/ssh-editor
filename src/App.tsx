@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { message } from '@tauri-apps/plugin-dialog';
 import BottomPanel from './components/BottomPanel';
 import EditorArea from './components/EditorArea';
 import SidePanel from './components/SidePanel';
@@ -20,13 +21,16 @@ import SettingsDialog from './components/Dialogs/SettingsDialog';
 import SaveConflictDialog from './components/Dialogs/SaveConflictDialog';
 import OpenFileDialog from './components/Dialogs/OpenFileDialog';
 import ConfirmDialog from './components/Dialogs/ConfirmDialog';
+import Toasts from './components/Toasts';
 import PromptDialog from './components/Dialogs/PromptDialog';
 import ReconnectDialog from './components/Dialogs/ReconnectDialog';
 import ExternalChangeDialog from './components/Dialogs/ExternalChangeDialog';
 import ThemePicker from './components/ThemePicker';
 import LanguageStatus from './components/LanguageStatus';
-import { getStartupArgs, openNewWindow, sshPing } from './ipc/commands';
+import IndentStatus from './components/IndentStatus';
+import { exitVote, getStartupArgs, openNewWindow, sshPing } from './ipc/commands';
 import { onTransferProgress } from './ipc/events';
+import { confirmUnsavedChanges } from './utils/confirmUnsavedChanges';
 import { useConnectionStore } from './stores/connectionStore';
 import { useEditorStore } from './stores/editorStore';
 import { useTransferStore } from './stores/transferStore';
@@ -47,6 +51,15 @@ import styles from './App.module.css';
 function refreshVisibleFileTree() {
   const selected = useConnectionStore.getState().selectedSessionId;
   if (selected) useFileTreeStore.getState().refreshConnection(selected).catch(() => {});
+}
+
+function confirmClose(title: string) {
+  return confirmUnsavedChanges({
+    title,
+    countDirty: () => Object.values(useEditorStore.getState().tabsById).filter((tab) => tab.isDirty).length,
+    saveDirtyTabs: () => useEditorStore.getState().saveDirtyTabs(),
+    message,
+  });
 }
 
 export default function App() {
@@ -179,6 +192,58 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // 창 닫기와 앱 종료가 동시에 들어와도 확인 절차는 하나만 진행한다.
+  const closePending = useRef(false);
+
+  // 창 닫기 요청을 보류하고 미저장 문서의 저장 여부부터 확인한다.
+  useEffect(() => {
+    const unlisten = getCurrentWindow()
+      .onCloseRequested(async (event) => {
+        event.preventDefault();
+        if (closePending.current) return;
+        closePending.current = true;
+        try {
+          if (!(await confirmClose('창 닫기'))) return;
+          // destroy: close()를 다시 부르면 이 핸들러가 재진입한다
+          await getCurrentWindow().destroy();
+        } catch (e) {
+          log.error(`창 닫기 처리 실패: ${String(e)}`);
+        } finally {
+          closePending.current = false;
+        }
+      })
+      .catch((e) => log.warn(`창 닫기 감시 등록 실패: ${String(e)}`));
+
+    return () => { unlisten.then((fn) => fn?.()); };
+  }, []);
+
+  // Cmd+Q(앱 종료) — 백엔드가 종료를 보류하고 열린 모든 창에 확인을 요청한다.
+  // 창 닫기와 같은 흐름으로 저장·확인한 뒤 승인/취소를 회신 (모든 창이 승인해야 종료).
+  useEffect(() => {
+    let voting = false;
+    const unlisten = listen('app-exit-requested', async () => {
+      if (voting) return;
+      if (closePending.current) {
+        await exitVote(false).catch((e) => log.error(`종료 취소 실패: ${String(e)}`));
+        return;
+      }
+      voting = true;
+      closePending.current = true;
+      try {
+        await exitVote(await confirmClose('앱 종료'));
+      } catch (e) {
+        log.error(`종료 처리 실패: ${String(e)}`);
+        await exitVote(false).catch(() => {});
+      } finally {
+        voting = false;
+        closePending.current = false;
+      }
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, []);
+
   // Cmd/Ctrl+W: 활성 탭 닫기 → 열린 탭이 하나도 없으면 창 닫기
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -309,6 +374,7 @@ export default function App() {
 
           <div className={styles.statusRight}>
             <WordWrapStatus />
+            <IndentStatus />
             <LanguageStatus />
             <button
               className={`${styles.statusBtn} ${sidebarVisible ? styles.active : ''}`}
@@ -341,6 +407,7 @@ export default function App() {
       <SaveConflictDialog />
       <OpenFileDialog />
       <ConfirmDialog />
+      <Toasts />
       <PromptDialog />
       <ReconnectDialog />
       <ExternalChangeDialog />

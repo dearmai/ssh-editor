@@ -11,6 +11,8 @@ import {
   transferCancel,
 } from '../ipc/commands';
 import type { ArchiveFormat, TransferProgressEvent } from '../types';
+import type { UploadItem } from '../types/uploads';
+import { toastError } from './toastStore';
 import { confirm } from './confirmStore';
 import { log } from './logStore';
 import { useFileTreeStore } from './fileTreeStore';
@@ -37,6 +39,8 @@ interface TransferStore {
   uploadFiles: (sessionId: string, remoteDir: string) => Promise<void>;
   /** 드래그 앤 드롭으로 받은 File 객체들을 업로드 (권한·이름 충돌 사전 점검 포함) */
   uploadDroppedFiles: (sessionId: string, remoteDir: string, files: File[]) => Promise<void>;
+  /** 권한 검사와 사용자 확인을 마친 클립보드 파일을 전송 큐에 넣는다. */
+  enqueueClipboardUploads: (sessionId: string, remoteDir: string, items: UploadItem[]) => void;
   downloadFile: (sessionId: string, remotePath: string, name: string) => Promise<void>;
   downloadDir: (
     sessionId: string,
@@ -196,6 +200,29 @@ export const useTransferStore = create<TransferStore>((set, get) => ({
       }));
     }
     kick();
+  },
+
+  enqueueClipboardUploads: (sessionId, remoteDir, items) => {
+    const transfers: Transfer[] = items.map((item) => {
+      const id = crypto.randomUUID();
+      const remotePath = joinPath(remoteDir, item.name);
+      const source = item.source;
+      runners.set(id, async () => {
+        try {
+          if (source.kind === 'local') await sftpUpload(sessionId, source.path, remotePath, id);
+          else await uploadFileChunked(sessionId, source.file, remotePath, id);
+          await useFileTreeStore.getState().refreshDir(sessionId, remoteDir).catch(() => {});
+        } catch (e) {
+          if (!canceling.has(id)) toastError(`업로드 실패: ${item.name} — ${String(e)}`);
+          throw e;
+        }
+      });
+      return { id, kind: 'upload', name: item.name, remotePath,
+        localPath: source.kind === 'local' ? source.path : '(클립보드)',
+        total: item.size, transferred: 0, speed: 0, status: 'queued', startedAt: Date.now() };
+    });
+    set((s) => ({ transfers: [...s.transfers, ...transfers] }));
+    void kick();
   },
 
   downloadFile: async (sessionId, remotePath, name) => {

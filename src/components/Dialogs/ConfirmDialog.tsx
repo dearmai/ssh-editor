@@ -13,7 +13,7 @@ export default function ConfirmDialog() {
     <Dialog.Root open={open} onOpenChange={(o) => !o && respond(false)}>
       <Dialog.Portal>
         <Dialog.Overlay className={styles.overlay} />
-        <Dialog.Content className={styles.content}>
+        <Dialog.Content className={`${styles.content} ${current?.wide ? styles.wideContent : ''}`}>
           <div className={styles.header}>
             <Dialog.Title className={styles.title}>
               <AlertTriangle

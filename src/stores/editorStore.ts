@@ -88,6 +88,11 @@ interface EditorStore {
   setDraggingTab: (info: { tabId: string; fromGroupId: string } | null) => void;
   closeGroup: (groupId: string) => void;
   closeConnectionTabs: (connectionId: string) => void;
+  /**
+   * 미저장 탭을 모두 저장 시도한다. connectionId를 주면 그 연결의 탭만 대상.
+   * 외부 변경 충돌 등으로 저장이 보류될 수 있으므로, 끝난 뒤에도 남아 있는 미저장 탭 수를 돌려준다.
+   */
+  saveDirtyTabs: (connectionId?: string) => Promise<number>;
 }
 
 // ── 레이아웃 트리 헬퍼 ──────────────────────────────
@@ -609,6 +614,15 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       const tabsById = pruneTabs(s.tabsById, groupsById);
       return { groupsById, layout, activeGroupId, tabsById };
     });
+  },
+
+  saveDirtyTabs: async (connectionId) => {
+    const mine = (t: EditorTab) => !connectionId || t.connectionId === connectionId;
+    const dirty = Object.values(get().tabsById).filter((t) => mine(t) && t.isDirty);
+    for (const tab of dirty) {
+      await get().saveTab(tab.id).catch(() => {});
+    }
+    return Object.values(get().tabsById).filter((t) => mine(t) && t.isDirty).length;
   },
 
   closeConnectionTabs: (connectionId) => {

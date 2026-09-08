@@ -41,6 +41,8 @@ async-trait  = { version = "0.1" }
 regex        = { version = "1" }
 once_cell    = { version = "1" }
 tauri-plugin-clipboard-manager = "2"
+arboard = "3.6.1"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp"] }
 
 [features]
 default = ["custom-protocol"]

@@ -48,7 +48,7 @@ export default function SidePanel() {
               <button
                 className={`${styles.iconBtn} ${styles.danger}`}
                 title="연결 해제"
-                onClick={() => disconnect(conn.sessionId)}
+                onClick={() => { void disconnect(conn.sessionId); }}
               >
                 <WifiOff size={13} />
               </button>

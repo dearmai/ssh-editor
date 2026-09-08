@@ -1,6 +1,7 @@
 import {
   Moon,
   Plus,
+  SquareTerminal,
   SplitSquareHorizontal,
   SplitSquareVertical,
   Sun,
@@ -21,8 +22,15 @@ import styles from './TerminalSidebar.module.css';
 /**
  * VSCode식 터미널 탭 사이드바 (우측). 분할 그룹별로 묶어 세로 목록으로 관리.
  * compact = 상위 패널에 이미 "터미널" 타이틀바가 있는 경우(우측 도킹) 라벨만 줄인다.
+ * iconOnly = 폭이 좁은 우측 도킹 — 이름 대신 아이콘 레일로 표시한다.
  */
-export default function TerminalSidebar({ compact = false }: { compact?: boolean }) {
+export default function TerminalSidebar({
+  compact = false,
+  iconOnly = false,
+}: {
+  compact?: boolean;
+  iconOnly?: boolean;
+}) {
   const sessions = useTerminalStore((s) => s.sessions);
   const groups = useTerminalStore((s) => s.groups);
   const activeGroupId = useTerminalStore((s) => s.activeGroupId);
@@ -97,9 +105,9 @@ export default function TerminalSidebar({ compact = false }: { compact?: boolean
   };
 
   return (
-    <div className={styles.sidebar}>
+    <div className={`${styles.sidebar} ${iconOnly ? styles.iconRail : ''}`}>
       <div className={styles.head}>
-        <span className={styles.headTitle}>{compact ? '목록' : '터미널'}</span>
+        {!iconOnly && <span className={styles.headTitle}>{compact ? '목록' : '터미널'}</span>}
         <div className={styles.headActions}>
           {activeTerminal && (
             <button
@@ -204,12 +212,21 @@ export default function TerminalSidebar({ compact = false }: { compact?: boolean
                     }}
                     onClick={() => focusTerminal(id)}
                     onDoubleClick={(e) => {
+                      if (iconOnly) return;
                       e.stopPropagation();
                       startRename(id);
                     }}
-                    title={`${titleOf(id)} — 클릭: 표시 / 더블클릭: 이름 변경 / 드래그: 재배치`}
+                    title={
+                      iconOnly
+                        ? `${titleOf(id)} — 클릭: 표시 / 드래그: 재배치`
+                        : `${titleOf(id)} — 클릭: 표시 / 더블클릭: 이름 변경 / 드래그: 재배치`
+                    }
                   >
-                    {editing ? (
+                    {iconOnly ? (
+                      <span className={styles.rowIcon}>
+                        <SquareTerminal size={15} />
+                      </span>
+                    ) : editing ? (
                       <input
                         ref={inputRef}
                         className={styles.rename}

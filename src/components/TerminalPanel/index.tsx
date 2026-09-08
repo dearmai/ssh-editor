@@ -57,7 +57,7 @@ export default function TerminalPanel({ visible }: { visible: boolean }) {
         <div className={styles.main}>
           <TerminalGrid active={visible} />
         </div>
-        {!listCollapsed && <TerminalSidebar compact={docked} />}
+        {!listCollapsed && <TerminalSidebar compact={docked} iconOnly={docked} />}
       </div>
     </div>
   );

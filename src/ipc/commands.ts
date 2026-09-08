@@ -1,4 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
+import type { NativeClipboardUpload } from '../types/uploads';
+
+export const readClipboardUploads = () => invoke<NativeClipboardUpload[]>('read_clipboard_uploads');
 import type {
   ActiveConnection,
   ArchiveFormat,
@@ -147,6 +150,9 @@ export const terminalWrite = (terminalId: string, data: string) =>
 
 export const terminalResize = (terminalId: string, cols: number, rows: number) =>
   invoke<void>('terminal_resize', { terminalId, cols, rows });
+
+/** 종료 확인 결과 보고 — 모든 창이 승인해야 앱이 종료된다 (Cmd+Q 흐름) */
+export const exitVote = (approve: boolean) => invoke<void>('exit_vote', { approve });
 
 export const terminalClose = (terminalId: string) =>
   invoke<void>('terminal_close', { terminalId });

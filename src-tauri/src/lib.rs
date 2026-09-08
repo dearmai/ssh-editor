@@ -6,6 +6,7 @@ mod ssh;
 use commands::*;
 use serde::{Deserialize, Serialize};
 use ssh::{SshConnectionPool, TerminalPool};
+use std::collections::HashSet;
 use std::sync::Mutex;
 use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
@@ -21,6 +22,31 @@ pub struct StartupArgs {
 
 pub struct StartupArgsState(pub Mutex<Option<StartupArgs>>);
 
+/// 종료 확인 대기 중인 창 라벨 집합. None이면 종료 절차가 진행 중이 아니다.
+/// 모든 창이 승인(exit_vote(true))해야 실제로 종료하고, 한 창이라도 취소하면 절차를 접는다.
+pub struct ExitVoteState(pub Mutex<Option<HashSet<String>>>);
+
+/// 종료 절차 시작 — 열린 모든 창에 확인을 요청한다 (미저장 문서 저장·확인은 프론트가 수행)
+fn start_exit_flow(app: &tauri::AppHandle) {
+    let labels: HashSet<String> = app.webview_windows().keys().cloned().collect();
+    if labels.is_empty() {
+        app.exit(0);
+        return;
+    }
+    {
+        let state = app.state::<ExitVoteState>();
+        let mut pending = state.0.lock().unwrap();
+        // 이미 확인을 요청해 둔 상태면 중복 요청하지 않는다 (Cmd+Q 연타)
+        if pending.is_some() {
+            return;
+        }
+        *pending = Some(labels.clone());
+    }
+    for label in labels {
+        let _ = app.emit_to(label.as_str(), "app-exit-requested", ());
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run(startup_args: Option<StartupArgs>) {
     tauri::Builder::default()
@@ -31,12 +57,18 @@ pub fn run(startup_args: Option<StartupArgs>) {
         .manage(TerminalPool::new())
         .manage(ssh::TransferCancelState::new())
         .manage(StartupArgsState(Mutex::new(startup_args)))
+        .manage(ExitVoteState(Mutex::new(None)))
         .setup(|app| {
             let prefs_item = MenuItemBuilder::with_id("preferences", "환경설정...")
                 .accelerator("CmdOrCtrl+,")
                 .build(app)?;
             let new_window_item = MenuItemBuilder::with_id("new-window", "새 창")
                 .accelerator("CmdOrCtrl+Shift+N")
+                .build(app)?;
+            // 기본 quit 항목은 macOS에서 ExitRequested 없이 즉시 종료되어 미저장 확인을
+            // 건너뛴다. 직접 만든 항목으로 대체해 프론트 확인 절차를 태운다.
+            let quit_item = MenuItemBuilder::with_id("quit", "SSH Editor 종료")
+                .accelerator("CmdOrCtrl+Q")
                 .build(app)?;
 
             let app_menu = SubmenuBuilder::new(app, "SSH Editor")
@@ -51,7 +83,7 @@ pub fn run(startup_args: Option<StartupArgs>) {
                 .hide_others()
                 .show_all()
                 .separator()
-                .quit()
+                .item(&quit_item)
                 .build()?;
 
             let word_wrap_item = MenuItemBuilder::with_id("toggle-word-wrap", "자동 줄바꿈")
@@ -87,6 +119,9 @@ pub fn run(startup_args: Option<StartupArgs>) {
             app.set_menu(menu)?;
 
             app.on_menu_event(|app, event| match event.id().as_ref() {
+                "quit" => {
+                    start_exit_flow(app);
+                }
                 "preferences" => {
                     app.emit("menu-preferences", ()).ok();
                 }
@@ -159,9 +194,47 @@ pub fn run(startup_args: Option<StartupArgs>) {
             terminal_resize,
             // 기타
             get_startup_args,
+            read_clipboard_uploads,
+            exit_vote,
         ])
-        .run(tauri::generate_context!())
-        .expect("SSH Editor 실행 오류");
+        .build(tauri::generate_context!())
+        .expect("SSH Editor 실행 오류")
+        .run(|app, event| {
+            // Cmd+Q(앱 종료)는 창 close 이벤트를 거치지 않는다. 종료를 일단 막고
+            // 프론트에 알려 미저장 문서를 저장·확인하게 한 뒤, confirm_exit 로 다시 종료한다.
+            if let tauri::RunEvent::ExitRequested { api, code, .. } = &event {
+                // code가 있는 종료(= 확인을 마친 app.exit)는 그대로 진행
+                if code.is_none() {
+                    api.prevent_exit();
+                    start_exit_flow(app);
+                }
+            }
+        });
+}
+
+/// 창 하나의 종료 확인 결과. 모든 창이 승인하면 실제로 종료하고, 하나라도 취소하면 절차를 접는다.
+#[tauri::command]
+fn exit_vote(app: tauri::AppHandle, window: tauri::Window, approve: bool) {
+    let state = app.state::<ExitVoteState>();
+    let done = {
+        let mut guard = state.0.lock().unwrap();
+        let Some(pending) = guard.as_mut() else {
+            return; // 진행 중인 종료 절차가 없음
+        };
+        if !approve {
+            *guard = None;
+            return;
+        }
+        pending.remove(window.label());
+        let empty = pending.is_empty();
+        if empty {
+            *guard = None;
+        }
+        empty
+    };
+    if done {
+        app.exit(0);
+    }
 }
 
 #[tauri::command]

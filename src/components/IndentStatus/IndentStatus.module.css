@@ -1,0 +1,86 @@
+/* 상태바 버튼 (App의 statusBtn과 동일한 느낌) */
+.statusBtn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  height: 100%;
+  color: var(--status-bar-fg);
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: background 0.1s, opacity 0.1s;
+}
+.statusBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  opacity: 1;
+}
+/* 이 파일에만 적용된 오버라이드가 있을 때 점으로 표시 */
+.overrideDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.menu {
+  min-width: 220px;
+  padding: 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  z-index: 300;
+}
+
+.menuLabel {
+  padding: 6px 8px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 8px;
+  border-radius: 3px;
+  font-size: 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+  outline: none;
+}
+.item[data-highlighted],
+.item:hover {
+  background: var(--bg-hover);
+}
+.itemCheck {
+  margin-left: auto;
+  color: var(--accent);
+}
+.item:disabled,
+.item[data-disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.separator {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--border);
+}
+
+.source {
+  padding: 4px 8px 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.sourceKey {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}

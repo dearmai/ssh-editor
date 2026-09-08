@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { message } from '@tauri-apps/plugin-dialog';
+import { confirmUnsavedChanges } from '../utils/confirmUnsavedChanges';
 import {
   deleteProfile,
   getActiveConnections,
@@ -25,6 +27,7 @@ export interface ReconnectState {
 }
 
 const RECONNECT_TIMEOUT_MS = 5000;
+const pendingDisconnects = new Set<string>();
 
 interface ConnectionStore {
   profiles: ConnectionProfile[];
@@ -43,7 +46,8 @@ interface ConnectionStore {
   /** startPath: 이 세션이 열릴 시작 경로 (기본 터미널의 cwd로도 사용) */
   connect: (profile: ConnectionProfile, startPath?: string) => Promise<string>;
   connectFromSshConfig: (host: SshConfigHost) => Promise<string>;
-  disconnect: (sessionId: string) => Promise<void>;
+  /** 미저장 파일 확인 후 연결 해제. 취소/저장 실패 시 false를 반환하고 상태를 유지한다. */
+  disconnect: (sessionId: string) => Promise<boolean>;
   setSelectedSession: (id: string | null) => void;
   refreshActiveConnections: () => Promise<void>;
   /** 활성 연결의 시작 디렉토리 목록을 갱신하고 프로필에 영속화 */
@@ -142,14 +146,39 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => ({
   },
 
   disconnect: async (sessionId) => {
+    if (pendingDisconnects.has(sessionId)) return false;
     const conn = get().activeConnections.find((c) => c.sessionId === sessionId);
-    await sshDisconnect(sessionId);
-    set((state) => ({
-      activeConnections: state.activeConnections.filter((c) => c.sessionId !== sessionId),
-      selectedSessionId:
-        state.selectedSessionId === sessionId ? null : state.selectedSessionId,
-    }));
-    if (conn) log.warn(`연결 해제: ${conn.profile.name} (${conn.profile.hostname})`);
+    if (!conn) return false;
+    pendingDisconnects.add(sessionId);
+    try {
+      const approved = await confirmUnsavedChanges({
+        title: `서버 연결 해제 — ${conn.profile.name}`,
+        countDirty: () => Object.values(useEditorStore.getState().tabsById)
+          .filter((tab) => tab.connectionId === sessionId && tab.isDirty).length,
+        saveDirtyTabs: () => useEditorStore.getState().saveDirtyTabs(sessionId),
+        message,
+      });
+      if (!approved) return false;
+
+      // 확인을 마친 뒤에만 해당 서버의 파일 탭 · 터미널 · 파일 트리를 정리한다.
+      useEditorStore.getState().closeConnectionTabs(sessionId);
+      await useTerminalStore.getState().closeConnectionSessions(sessionId).catch(() => {});
+      useFileTreeStore.getState().clearConnection(sessionId);
+      await sshDisconnect(sessionId);
+      set((state) => ({
+        activeConnections: state.activeConnections.filter((c) => c.sessionId !== sessionId),
+        selectedSessionId:
+          state.selectedSessionId === sessionId ? null : state.selectedSessionId,
+      }));
+      log.warn(`연결 해제: ${conn.profile.name} (${conn.profile.hostname})`);
+      return true;
+    } catch (e) {
+      set({ error: String(e) });
+      log.error(`연결 해제 실패: ${conn.profile.name} — ${e}`);
+      return false;
+    } finally {
+      pendingDisconnects.delete(sessionId);
+    }
   },
 
   setSelectedSession: (id) => set({ selectedSessionId: id }),
@@ -233,12 +262,10 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => ({
       await get().attemptReconnect(r.sessionId);
       return;
     }
-    // 'close' — 이 세션의 탭/터미널을 닫고 연결을 정리
-    set({ reconnect: null });
+    // 'close'도 동일한 미저장 확인을 거친다. 취소하면 복구 다이얼로그와 파일을 유지한다.
     const { sessionId, profileName } = r;
-    useEditorStore.getState().closeConnectionTabs(sessionId);
-    await useTerminalStore.getState().closeConnectionSessions(sessionId).catch(() => {});
-    await get().disconnect(sessionId).catch(() => {});
+    if (!(await get().disconnect(sessionId))) return;
+    if (get().reconnect?.sessionId === sessionId) set({ reconnect: null });
     log.warn(`세션 종료: ${profileName}`);
     // 남은 연결 재점검
     get().checkConnections();

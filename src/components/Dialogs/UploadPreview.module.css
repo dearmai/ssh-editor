@@ -1,0 +1,19 @@
+.preview { display: grid; gap: 12px; color: var(--text-primary); }
+.preview p { margin: 0; }
+.destination { color: var(--text-secondary); display: grid; gap: 4px; overflow-wrap: anywhere; }
+.destination strong { color: var(--text-primary); }
+.list { display: grid; gap: 10px; max-height: 50vh; overflow-y: auto; }
+.item { display: flex; gap: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 6px; }
+.imageList { max-height: 60vh; gap: 16px; }
+.imageItem { min-width: 0; display: grid; gap: 6px; }
+.thumbnail { display: block; width: 100%; height: min(50vh, 560px); object-fit: contain; background: var(--bg-primary); border-radius: 6px; }
+.imageCaption { display: flex; gap: 12px; justify-content: space-between; color: var(--text-secondary); font-size: 11px; }
+.imageName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.imageSize { flex-shrink: 0; }
+.imageDestination { color: var(--text-secondary); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.icon { flex-shrink: 0; margin: 12px; }
+.details { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 5px; }
+.name { overflow-wrap: anywhere; }
+.meta { color: var(--text-secondary); font-size: 11px; }
+.warning { color: #e8a54b; font-size: 12px; }
+.text { margin: 4px 0 0; padding: 8px; max-height: 120px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; background: var(--bg-primary); border-radius: 4px; }

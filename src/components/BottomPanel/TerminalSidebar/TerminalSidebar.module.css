@@ -185,26 +185,83 @@
   opacity: 0;
   flex-shrink: 0;
 }
-.row:hover /* 인라인 이름 변경 입력 */
-.rename {
-  flex: 1;
-  min-width: 0;
-  height: 20px;
-  padding: 0 4px;
-  background: var(--bg-primary);
-  border: 1px solid var(--accent);
-  border-radius: 3px;
-  color: var(--text-primary);
-  font-size: 12px;
-  font-family: inherit;
-  user-select: text;
-}
-
-.rowClose {
+.row:hover .rowClose {
   opacity: 0.8;
 }
 .rowClose:hover {
   background: var(--bg-active);
   color: var(--text-primary);
+  opacity: 1;
+}
+
+/* ── 아이콘 레일 (우측 도킹): 이름 대신 터미널 아이콘만 세로로 나열 ── */
+.iconRail {
+  flex: 0 0 34px;
+}
+.iconRail .head {
+  padding: 0;
+  justify-content: center;
+}
+.iconRail .headActions {
+  flex-wrap: wrap;
+  justify-content: center;
+}
+/* 액션이 4개까지 들어가도록 헤더는 2줄 높이로 */
+.iconRail .head {
+  height: auto;
+  min-height: 28px;
+  padding: 2px 0;
+}
+.iconRail .iconBtn {
+  width: 26px;
+  height: 24px;
+}
+.iconRail .list {
+  padding: 4px 0;
+}
+.iconRail .empty {
+  display: none;
+}
+.iconRail .splitGroup::before {
+  left: 4px;
+  top: 8px;
+  bottom: 8px;
+}
+.iconRail .row {
+  justify-content: center;
+  gap: 0;
+  height: 30px;
+  padding: 0;
+  border-left-width: 2px;
+}
+.iconRail .rowGrouped {
+  padding-left: 8px;
+}
+.iconRail .rowGrouped::before {
+  left: 4px;
+  width: 5px;
+}
+/* 아이콘 모드에선 그룹 행에도 왼쪽 액센트 표시 (연결선만으론 식별이 약함) */
+.iconRail .row.focused {
+  border-left-color: var(--accent);
+}
+
+.rowIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 닫기 버튼은 hover 시 아이콘 위에 겹쳐 표시 */
+.iconRail .rowClose {
+  position: absolute;
+  right: 1px;
+  top: 1px;
+  width: 13px;
+  height: 13px;
+  background: var(--bg-tertiary);
+  border-radius: 2px;
+}
+.iconRail .row:hover .rowClose {
   opacity: 1;
 }

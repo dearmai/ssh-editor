@@ -1,0 +1,27 @@
+/* 번들 내재화 폰트 — CDN/네트워크 의존 없이 앱 자산으로 로드한다.
+   Pretendard(UI) · D2Coding(모노) 모두 SIL Open Font License 1.1.
+   출처·라이선스는 src/assets/fonts/NOTICE.md 참고. */
+
+@font-face {
+  font-family: 'Pretendard Variable';
+  src: url('../assets/fonts/PretendardVariable.woff2') format('woff2-variations');
+  font-weight: 45 930; /* 가변 축(wght) 범위 */
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'D2Coding';
+  src: url('../assets/fonts/D2Coding-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'D2Coding';
+  src: url('../assets/fonts/D2Coding-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}

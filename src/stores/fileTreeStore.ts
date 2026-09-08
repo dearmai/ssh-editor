@@ -52,6 +52,8 @@ interface FileTreeStore {
   refreshDir: (connectionId: string, path: string) => Promise<void>;
   /** 해당 연결의 캐시를 모두 무효화하고 현재 열려있던 경로들을 다시 로드 (재접속 후 사용) */
   refreshConnection: (connectionId: string) => Promise<void>;
+  /** 해당 연결의 트리 상태(캐시·펼침·루트·선택·클립보드)를 모두 버린다 (연결 해제 시) */
+  clearConnection: (connectionId: string) => void;
   setRootPath: (connectionId: string, path: string) => void;
   setSelected: (connectionId: string, path: string) => void;
   isSelected: (connectionId: string, path: string) => boolean;
@@ -149,6 +151,33 @@ export const useFileTreeStore = create<FileTreeStore>((set, get) => ({
     } catch {
       // 백그라운드 새로고침 실패는 조용히 무시 (기존 목록 유지)
     }
+  },
+
+  clearConnection: (connectionId) => {
+    set((state) => {
+      const treeCache = new Map(state.treeCache);
+      const expandedPaths = new Map(state.expandedPaths);
+      const rootPaths = new Map(state.rootPaths);
+      const selectedPaths = new Map(state.selectedPaths);
+      treeCache.delete(connectionId);
+      expandedPaths.delete(connectionId);
+      rootPaths.delete(connectionId);
+      selectedPaths.delete(connectionId);
+      const loadingPaths = new Set(
+        Array.from(state.loadingPaths).filter((k) => !k.startsWith(`${connectionId}:`))
+      );
+      return {
+        treeCache,
+        expandedPaths,
+        rootPaths,
+        selectedPaths,
+        loadingPaths,
+        // 끊긴 연결의 항목을 가리키는 클립보드/드래그 상태는 무효
+        clipboard: state.clipboard?.connectionId === connectionId ? null : state.clipboard,
+        dragging: state.dragging?.connectionId === connectionId ? null : state.dragging,
+        dropDir: state.dragging?.connectionId === connectionId ? null : state.dropDir,
+      };
+    });
   },
 
   refreshConnection: async (connectionId) => {

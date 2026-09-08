@@ -177,10 +177,10 @@ pub async fn exists(session: &SshSession, path: &str) -> AppResult<bool> {
     Ok(sftp.metadata(path).await.is_ok())
 }
 
-/// 디렉토리에 항목 생성/이동이 가능한지 사전 점검 (원격 shell 의 test -w/-x 로 실효 권한 확인)
+/// 실효 쓰기 권한 확인. 디렉토리는 항목 접근을 위한 실행 권한도 필요하다.
 pub async fn check_write_access(session: &SshSession, dir: &str) -> AppResult<bool> {
     let q = shell_quote(dir);
-    let (_, code) = run_command(session, &format!("test -w {} && test -x {}", q, q)).await?;
+    let (_, code) = run_command(session, &format!("test -w {q} && {{ ! test -d {q} || test -x {q}; }}")).await?;
     Ok(code == 0)
 }
 

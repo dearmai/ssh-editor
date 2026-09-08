@@ -1,0 +1,5 @@
+.container { position: fixed; right: 20px; bottom: 40px; z-index: 1000; display: grid; gap: 8px; pointer-events: none; max-width: min(440px, calc(100vw - 40px)); }
+.toast { display: flex; align-items: flex-start; gap: 10px; padding: 14px; color: var(--text-primary); background: var(--bg-secondary); border: 1px solid #d65d5d; border-radius: 8px; box-shadow: 0 6px 24px #0005; pointer-events: auto; }
+.toast > svg { color: #e57979; flex-shrink: 0; }
+.toast span { overflow-wrap: anywhere; font-size: 13px; }
+.toast button { color: var(--text-secondary); flex-shrink: 0; }
