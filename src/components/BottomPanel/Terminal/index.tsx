@@ -1,8 +1,9 @@
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import { Terminal, type ITheme } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { onTerminalData } from '../../../ipc/events';
 import { terminalWrite, terminalResize } from '../../../ipc/commands';
 import { log } from '../../../stores/logStore';
@@ -10,6 +11,9 @@ import { useSettingsStore } from '../../../stores/settingsStore';
 import { useTerminalStore } from '../../../stores/terminalStore';
 import { getTheme } from '../../../themes';
 import { decodeOsc52Base64, readClipboard, writeClipboard } from '../../../utils/clipboard';
+import { TerminalViewport } from '../../../utils/terminalViewport';
+import { createTerminalLinkOpener } from '../../../utils/terminalLinks';
+import { toastError } from '../../../stores/toastStore';
 import styles from './Terminal.module.css';
 
 interface Props {
@@ -22,7 +26,10 @@ interface Props {
 export default function TerminalPane({ sessionId, connectionId: _connectionId, visible = true }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
-  const fitRef = useRef<FitAddon | null>(null);
+  const viewportRef = useRef<TerminalViewport | null>(null);
+  const visibleRef = useRef(visible);
+  const restoringRef = useRef(true);
+  const measureRef = useRef<((remeasureFont?: boolean) => void) | null>(null);
   /** 마지막으로 서버에 보낸 크기 — 같은 값 중복 전송 방지 */
   const lastSizeRef = useRef<{ cols: number; rows: number } | null>(null);
 
@@ -39,6 +46,7 @@ export default function TerminalPane({ sessionId, connectionId: _connectionId, v
 
   const terminalFontFamily = useSettingsStore((s) => s.terminalFontFamily);
   const terminalFontSize = useSettingsStore((s) => s.terminalFontSize);
+  const fontRef = useRef({ family: terminalFontFamily, size: terminalFontSize });
   const resolvedTheme = useSettingsStore((s) => s.resolvedTheme);
   const terminalDarkTheme = useSettingsStore((s) => s.terminalDarkTheme);
   const terminalLightTheme = useSettingsStore((s) => s.terminalLightTheme);
@@ -52,29 +60,47 @@ export default function TerminalPane({ sessionId, connectionId: _connectionId, v
     effectiveType
   ).terminal;
 
-  // xterm은 숨김(width 0) 상태에서 생성되면 char 폭 측정에 실패해 기본 monospace로
-  // 렌더된 뒤 갱신되지 않는다. fit/refresh만으론 폰트 CSS가 재주입되지 않으므로,
-  // fontFamily를 다른 값으로 한 번 흔들어(nudge) 렌더러의 재측정·폰트 재주입을 강제한다.
-  const remeasureFont = (term: Terminal) => {
-    term.options.fontFamily = 'monospace';
-    term.options.fontFamily = terminalFontFamily;
-    term.options.fontSize = terminalFontSize;
-    fitRef.current?.fit();
-    term.refresh(0, term.rows - 1);
-  };
+  useLayoutEffect(() => {
+    fontRef.current = { family: terminalFontFamily, size: terminalFontSize };
+  }, [terminalFontFamily, terminalFontSize]);
 
-  // 폰트/테마 변경 시 기존 터미널에 반영
+  // display:none으로 인한 리사이즈/스크롤 이벤트가 오기 전에 원래 위치를 보관한다.
+  useLayoutEffect(() => {
+    if (!visible && visibleRef.current) {
+      if (!restoringRef.current) viewportRef.current?.capture();
+      restoringRef.current = true;
+    }
+    visibleRef.current = visible;
+  }, [visible]);
+
+  // 테마 변경은 크기 재측정 없이 적용한다.
   useEffect(() => {
     const term = termRef.current;
     if (!term) return;
     term.options.theme = termTheme;
-    remeasureFont(term);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [terminalFontFamily, terminalFontSize, termTheme]);
+  }, [termTheme]);
+
+  useEffect(() => {
+    measureRef.current?.(true);
+  }, [terminalFontFamily, terminalFontSize]);
 
   useEffect(() => {
     if (!containerRef.current) return;
     lastSizeRef.current = null;
+    restoringRef.current = true;
+    const container = containerRef.current;
+    const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
+    const linkHandler = {
+      activate: createTerminalLinkOpener(isMac, openUrl, (error) => {
+        log.error(`브라우저에서 링크 열기 실패: ${String(error)}`);
+        toastError('브라우저에서 링크를 열지 못했습니다.');
+      }),
+      hover: (_event: MouseEvent, uri: string) => {
+        container.title = `${uri}\n${isMac ? 'Cmd' : 'Ctrl'}+클릭으로 브라우저에서 열기`;
+      },
+      leave: () => { container.removeAttribute('title'); },
+      allowNonHttpProtocols: false,
+    };
 
     const term = new Terminal({
       theme: termTheme,
@@ -82,22 +108,57 @@ export default function TerminalPane({ sessionId, connectionId: _connectionId, v
       fontFamily: terminalFontFamily,
       scrollback: 5000,
       cursorBlink: true,
+      // OSC 8 하이퍼링크도 일반 URL과 같은 클릭 규칙을 사용한다.
+      linkHandler,
     });
 
     const fitAddon = new FitAddon();
-    const webLinksAddon = new WebLinksAddon();
+    const webLinksAddon = new WebLinksAddon(linkHandler.activate, linkHandler);
     term.loadAddon(fitAddon);
     term.loadAddon(webLinksAddon);
     term.open(containerRef.current);
-    fitAddon.fit();
 
     termRef.current = term;
-    fitRef.current = fitAddon;
+    const viewport = new TerminalViewport(term);
+    viewportRef.current = viewport;
+    let disposed = false;
+    let restoreFrame = 0;
+    let revision = 0;
+    const canMeasure = () => !disposed && visibleRef.current
+      && !!containerRef.current?.clientWidth && !!containerRef.current?.clientHeight
+      && !!containerRef.current?.getClientRects().length;
 
-    // 생성 직후(숨김 상태일 수 있음) 폰트 재측정 강제 + 폰트 로드 완료 후 한 번 더
-    remeasureFont(term);
+    const measure = (remeasureFont = false) => {
+      // 숨긴 패널을 fit하면 2열×1행까지 줄어들어 원격 TUI와 스크롤백이 재배치될 수 있다.
+      if (!canMeasure()) return;
+      if (!restoringRef.current) viewport.capture();
+      restoringRef.current = true;
+      const currentRevision = ++revision;
+      cancelAnimationFrame(restoreFrame);
+      if (remeasureFont) {
+        term.options.fontFamily = 'monospace';
+        term.options.fontFamily = fontRef.current.family;
+        term.options.fontSize = fontRef.current.size;
+      }
+      fitAddon.fit();
+      sendResize(term.cols, term.rows);
+      term.refresh(0, term.rows - 1);
+      // 숨김 중 받은 출력의 파싱과 새 레이아웃 반영 이후에 복원한다.
+      term.write('', () => {
+        if (!canMeasure() || revision !== currentRevision) return;
+        restoreFrame = requestAnimationFrame(() => {
+          if (!canMeasure() || revision !== currentRevision) return;
+          viewport.restore();
+          term.refresh(0, term.rows - 1);
+          restoringRef.current = false;
+        });
+      });
+    };
+    measureRef.current = measure;
+
+    measure(true);
     document.fonts?.ready.then(() => {
-      if (termRef.current === term) remeasureFont(term);
+      if (!disposed) measure(true);
     });
 
     // OSC 52 — 원격 pbcopy/tmux 등이 보낸 클립보드 쓰기를 로컬 클립보드에 반영
@@ -125,7 +186,7 @@ export default function TerminalPane({ sessionId, connectionId: _connectionId, v
 
     // 터미널 출력 수신
     const unlistenPromise = onTerminalData((payload) => {
-      if (payload.terminalId === sessionId) {
+      if (!disposed && payload.terminalId === sessionId) {
         const bytes = atob(payload.data);
         const buf = new Uint8Array(bytes.length);
         for (let i = 0; i < bytes.length; i++) buf[i] = bytes.charCodeAt(i);
@@ -143,8 +204,7 @@ export default function TerminalPane({ sessionId, connectionId: _connectionId, v
 
     // 리사이즈 — 크기가 바뀔 때만 PTY에 window-change 전송
     const observer = new ResizeObserver(() => {
-      fitAddon.fit();
-      sendResize(term.cols, term.rows);
+      measure();
     });
     observer.observe(containerRef.current);
     // xterm이 자체적으로 감지한 크기 변화(폰트 변경 등)도 서버에 반영
@@ -186,29 +246,25 @@ export default function TerminalPane({ sessionId, connectionId: _connectionId, v
     });
 
     return () => {
+      disposed = true;
+      container.removeAttribute('title');
+      cancelAnimationFrame(restoreFrame);
       unlistenPromise.then((f) => f());
       observer.disconnect();
       offResize.dispose();
+      viewport.dispose();
+      termRef.current = null;
+      viewportRef.current = null;
+      measureRef.current = null;
       term.dispose();
     };
   }, [sessionId]);
 
-  // 숨김(display:none)이던 터미널이 다시 보이게 될 때: xterm은 자동으로 다시 그리지 않으므로
-  // 레이아웃 반영 후(rAF) 강제로 fit + refresh. (분할로 새 열이 표시될 때 빈 화면 방지)
+  // 복귀 시 실제 크기로 재측정하고 터미널별로 보관한 스크롤 위치를 복원한다.
   useEffect(() => {
     if (!visible) return;
     const raf = requestAnimationFrame(() => {
-      const term = termRef.current;
-      const fit = fitRef.current;
-      if (!term || !fit) return;
-      try {
-        // 숨김 상태에서 생성돼 폰트 측정이 빗나갔을 수 있으니 표시될 때 재측정
-        remeasureFont(term);
-        sendResize(term.cols, term.rows);
-        term.scrollToBottom();
-      } catch {
-        /* 디스포즈 직후 등 — 무시 */
-      }
+      measureRef.current?.(true);
     });
     return () => cancelAnimationFrame(raf);
   }, [visible, sessionId]);

@@ -65,11 +65,18 @@ const EXT_MAP: Record<string, string> = {
   txt: 'plaintext',
 };
 
+const SHELL_CONFIG_FILES = new Set([
+  '.zshrc', '.zshenv', '.zprofile', '.zlogin', '.zlogout',
+  'zshrc', 'zshenv', 'zprofile', 'zlogin', 'zlogout',
+  '.bashrc', '.bash_profile', '.bash_login', '.bash_logout', '.profile',
+]);
+
 export function detectLanguage(filePath: string): string {
   const fileName = filePath.split('/').pop() ?? '';
   const lower = fileName.toLowerCase();
 
   // 특수 파일명 처리
+  if (SHELL_CONFIG_FILES.has(lower)) return 'shell';
   if (lower === 'dockerfile') return 'dockerfile';
   if (lower === 'makefile' || lower === 'gnumakefile') return 'makefile';
   if (lower === '.env' || lower.startsWith('.env.')) return 'shell';

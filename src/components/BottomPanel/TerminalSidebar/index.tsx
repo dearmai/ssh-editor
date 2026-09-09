@@ -224,7 +224,7 @@ export default function TerminalSidebar({
                   >
                     {iconOnly ? (
                       <span className={styles.rowIcon}>
-                        <SquareTerminal size={15} />
+                        <SquareTerminal size={22} />
                       </span>
                     ) : editing ? (
                       <input
@@ -252,7 +252,7 @@ export default function TerminalSidebar({
                         handleClose(id);
                       }}
                     >
-                      <X size={12} />
+                      <X size={iconOnly ? 14 : 12} />
                     </button>
                   </div>
                 );
