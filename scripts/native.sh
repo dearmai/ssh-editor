@@ -6,8 +6,8 @@
 #   ./scripts/native.sh [debug|release] [옵션] [-- <앱 실행 인자>]
 #
 # 옵션:
-#   -r, --run       빌드 후 바로 실행 (.app 으로 실행 → 터미널창 안 뜸)
-#   -b, --bundle    tauri 정식 .app 번들 생성 (배포용, 느림)
+#   -r, --run       빌드 후 실행 (macOS: .app / Linux: 바이너리)
+#   -b, --bundle    tauri 플랫폼별 정식 번들 생성 (배포용, 느림)
 #   -h, --help      도움말
 #
 # 예시:
@@ -25,6 +25,12 @@ set -euo pipefail
 # ── 프로젝트 루트 (이 스크립트는 scripts/ 안에 위치) ──────────────
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
+
+[ ! -f "$HOME/.cargo/env" ] || . "$HOME/.cargo/env"
+PLATFORM="$(uname -s)"
+if [ "$PLATFORM" = Linux ] && ! pkg-config --exists webkit2gtk-4.1; then
+  exec bash "$ROOT/scripts/linux-container.sh" bash scripts/native.sh "$@"
+fi
 
 BIN_NAME="ssh-editor"        # Cargo package name → 바이너리 이름
 APP_NAME="SSH Editor"        # productName → .app 이름
@@ -54,6 +60,7 @@ while [ $# -gt 0 ]; do
 done
 
 OUT_DIR="$ROOT/build/$MODE"
+TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/src-tauri/target}"
 
 # ── 최소 .app 번들 래핑 (터미널 없이 실행되게) ────────────────
 # $1: 바이너리 경로, $2: 출력 디렉토리
@@ -96,11 +103,10 @@ echo "════════════════════════�
 if [ "$DO_BUNDLE" = "1" ]; then
   echo "▶ [1/2] tauri 정식 번들 빌드 ($MODE)…"
   pushd src-tauri >/dev/null
-  if [ "$MODE" = "release" ]; then
-    npx tauri build --bundles app
-  else
-    npx tauri build --debug --bundles app
-  fi
+  BUNDLE_ARGS=()
+  [ "$PLATFORM" != Darwin ] || BUNDLE_ARGS=(--bundles app)
+  [ "$MODE" != debug ] || BUNDLE_ARGS+=(--debug)
+  npx tauri build "${BUNDLE_ARGS[@]}"
   popd >/dev/null
 else
   echo "▶ [1/2] 프론트엔드 빌드 (vite)…"
@@ -109,9 +115,9 @@ else
   echo "▶ [1/2] Rust 빌드 ($MODE)…"
   pushd src-tauri >/dev/null
   if [ "$MODE" = "release" ]; then
-    cargo build --release --features custom-protocol
+    cargo build --locked --release --features custom-protocol
   else
-    cargo build --features custom-protocol
+    cargo build --locked --features custom-protocol
   fi
   popd >/dev/null
 fi
@@ -123,17 +129,23 @@ mkdir -p "$OUT_DIR"
 
 RUN_TARGET=""
 
-if [ "$DO_BUNDLE" = "1" ]; then
+if [ "$PLATFORM" = Linux ]; then
+  cp -f "$TARGET_DIR/$MODE/$BIN_NAME" "$OUT_DIR/"
+  RUN_TARGET="$OUT_DIR/$BIN_NAME"
+  if [ "$DO_BUNDLE" = "1" ]; then
+    cp -R "$TARGET_DIR/$MODE/bundle" "$OUT_DIR/"
+  fi
+elif [ "$DO_BUNDLE" = "1" ]; then
   # tauri 가 만든 .app 사용
-  SRC_APP="src-tauri/target/$MODE/bundle/macos/$APP_NAME.app"
+  SRC_APP="$TARGET_DIR/$MODE/bundle/macos/$APP_NAME.app"
   if [ -d "$SRC_APP" ]; then
     cp -Rf "$SRC_APP" "$OUT_DIR/"
     RUN_TARGET="$OUT_DIR/$APP_NAME.app"
   fi
   # 단일 바이너리도 함께 복사
-  [ -f "src-tauri/target/$MODE/$BIN_NAME" ] && cp -f "src-tauri/target/$MODE/$BIN_NAME" "$OUT_DIR/"
+  [ -f "$TARGET_DIR/$MODE/$BIN_NAME" ] && cp -f "$TARGET_DIR/$MODE/$BIN_NAME" "$OUT_DIR/"
 else
-  SRC_BIN="src-tauri/target/$MODE/$BIN_NAME"
+  SRC_BIN="$TARGET_DIR/$MODE/$BIN_NAME"
   cp -f "$SRC_BIN" "$OUT_DIR/"
   # 단일 바이너리를 최소 .app 으로 래핑 → 터미널창 없이 실행
   make_app_bundle "$SRC_BIN" "$OUT_DIR"
@@ -152,7 +164,13 @@ if [ "$DO_RUN" = "1" ]; then
     exit 1
   fi
   echo "▶ 실행 (터미널 비종속): $RUN_TARGET ${APP_ARGS[*]:-}"
-  if [ ${#APP_ARGS[@]} -gt 0 ]; then
+  if [ "$PLATFORM" = Linux ]; then
+    if [ -z "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then
+      echo "GUI 실행에는 DISPLAY 또는 WAYLAND_DISPLAY가 필요합니다." >&2
+      exit 1
+    fi
+    exec "$RUN_TARGET" "${APP_ARGS[@]}"
+  elif [ ${#APP_ARGS[@]} -gt 0 ]; then
     open -n "$RUN_TARGET" --args "${APP_ARGS[@]}"
   else
     open -n "$RUN_TARGET"

@@ -1,6 +1,6 @@
 # SSH Editor
 
-VSCode 스타일의 **SSH 원격 파일 에디터**. Tauri v2 + React + Monaco Editor + Rust(russh) 기반으로, 원격 서버의 파일을 로컬 에디터처럼 탐색·편집하고 통합 터미널을 사용할 수 있는 macOS 데스크탑 앱입니다.
+VSCode 스타일의 **SSH 원격 파일 에디터**. Tauri v2 + React + Monaco Editor + Rust(russh) 기반으로, 원격 서버의 파일을 로컬 에디터처럼 탐색·편집하고 통합 터미널을 사용할 수 있는 데스크탑 앱입니다.
 
 ## 주요 기능
 
@@ -33,13 +33,50 @@ VSCode 스타일의 **SSH 원격 파일 에디터**. Tauri v2 + React + Monaco E
 
 ## 사전 준비
 
-- macOS (Apple Silicon/Intel)
-- [Node.js](https://nodejs.org/) 18+
-- [Rust](https://rustup.rs/) (stable) + Xcode Command Line Tools
+- macOS (Apple Silicon/Intel) 또는 Linux
+- [Node.js](https://nodejs.org/) 22+ (현재 검증 환경: 24)
+- [Rust](https://rustup.rs/) (stable)
+- macOS: Xcode Command Line Tools / Linux: GTK 3 및 WebKitGTK 4.1 개발 패키지
 
 ```bash
 npm install
 ```
+
+## 리눅스 개발 환경 및 실행
+
+```bash
+make env-setup        # 시스템 개발 패키지, Rust, npm 의존성 설치
+make env-check        # 실제 빌드 환경 점검
+make dev              # 프론트엔드 + Rust debug 빌드 후 GUI 실행
+```
+
+Ubuntu/Debian 및 Fedora에서는 배포판 개발 패키지를 설치합니다.
+Rocky/RHEL 9는 저장소에 WebKitGTK 4.1이 없으므로 **Podman의 Debian Bookworm 환경**을 자동으로 사용합니다.
+`scripts/Containerfile.linux`에 Node.js 24와 네이티브 개발 라이브러리를 정의하며,
+Rust는 사용자 홈의 rustup 설치를 공유합니다. 요구 라이브러리는 [Tauri 공식 사전 준비 문서](https://v2.tauri.app/start/prerequisites/#linux)를 참고하세요.
+
+Rocky Linux에서는 Podman 및 호스트의 `curl`이 필요합니다. Node.js가 호스트에 없으면
+`make env-setup`이 컨테이너에서 npm 의존성을 설치하며, 이후 명령도 아래 래퍼로 실행할 수 있습니다.
+
+```bash
+bash scripts/linux-container.sh                 # 빌드 후 GUI 실행
+bash scripts/linux-container.sh npm run tauri -- dev  # Vite HMR 개발
+bash scripts/linux-container.sh bash -c 'node --test tests/*.test.mjs'
+make verify                                    # 프론트엔드 빌드 + cargo check
+npm run native:release                         # release 바이너리 빌드
+bash scripts/linux-container.sh /workspace/build/release/ssh-editor  # 재빌드 없이 실행
+```
+
+일반 Linux 산출물은 `build/debug/ssh-editor` 또는 `build/release/ssh-editor`입니다.
+컨테이너에서 빌드한 바이너리는 Rocky 9 호스트에서 직접 실행하지 않고 위 래퍼로 실행합니다.
+컨테이너의 Rust 빌드 캐시는 `src-tauri/target/linux-container/`, 앱 설정은
+Podman 볼륨 `ssh-editor-linux-home`에 보존됩니다.
+
+컨테이너 GUI 실행에는 X11 또는 XWayland의 `DISPLAY`와 X 인증 파일
+(`XAUTHORITY`, 기본값 `~/.Xauthority`)이 필요합니다. 실행 스크립트는 X 소켓과 인증 파일을
+연결하며, `SSH_AUTH_SOCK`이 있으면 SSH Agent도 연결합니다. 호스트의 `~/.ssh`는 자동으로
+공유하지 않으므로 SSH 키 인증은 Agent를 사용하거나 컨테이너에서 접근 가능한 키 경로를 지정하세요.
+Linux에서는 macOS의 ⌘ 단축키 대신 Ctrl을 사용합니다.
 
 ## 개발
 
@@ -52,7 +89,7 @@ npm run tauri:dev      # 개발 모드 (HMR). custom-protocol 강제로 macOS 16
 
 ## 빌드 & 네이티브 실행
 
-`scripts/native.sh`가 프론트엔드 + Rust를 빌드하고, **단일 바이너리를 최소 `.app`으로 래핑**하여 터미널창 없이 GUI로 실행되게 합니다.
+`scripts/native.sh`가 프론트엔드 + Rust를 빌드합니다. macOS에서는 **단일 바이너리를 최소 `.app`으로 래핑**하여 터미널창 없이 GUI로 실행하고, Linux에서는 바이너리를 직접 실행합니다.
 
 ```bash
 npm run native           # debug 빌드 후 .app 으로 실행 (터미널창 안 뜸)

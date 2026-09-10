@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SSH Editor - macOS/Linux 빌드 환경 자동 세팅 스크립트
 # Makefile의 `make env-setup`이 호출함. macOS는 Homebrew + Xcode CLT 기준.
-set -uo pipefail
+set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CYAN='\033[0;36m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'; GRAY='\033[0;90m'; NC='\033[0m'
@@ -33,10 +33,25 @@ if [ "$(uname -s)" = "Darwin" ]; then
     fi
   fi
 else
-  echo -e "  ${YELLOW}Linux는 배포판 패키지 매니저로 build-essential/clang/node를 설치하세요.${NC}"
+  . /etc/os-release
+  if [[ "${ID:-} ${ID_LIKE:-}" =~ (rhel|rocky|almalinux|centos) ]] && [[ "${VERSION_ID:-}" = 9* ]]; then
+    command -v podman >/dev/null 2>&1 || sudo dnf install -y podman
+    bash "$ROOT/scripts/linux-container.sh" setup
+  elif command -v apt-get >/dev/null 2>&1; then
+    sudo apt-get update
+    sudo apt-get install -y build-essential pkg-config libssl-dev libgtk-3-dev \
+      libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf curl
+  elif command -v dnf >/dev/null 2>&1; then
+    sudo dnf install -y gcc gcc-c++ make pkgconf-pkg-config openssl-devel \
+      gtk3-devel webkit2gtk4.1-devel libappindicator-gtk3-devel librsvg2-devel patchelf curl
+  else
+    echo "지원하지 않는 배포판입니다. https://v2.tauri.app/start/prerequisites/ 참고" >&2
+    exit 1
+  fi
 fi
 
 # 4) Rust (rustup)
+[ ! -f "$HOME/.cargo/env" ] || . "$HOME/.cargo/env"
 if ! command -v cargo >/dev/null 2>&1; then
   echo -e "  ${CYAN}[INSTALL]${NC} Rust (rustup)..."
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -48,8 +63,13 @@ fi
 
 # 5) npm 의존성
 if [ -f "$ROOT/package.json" ] && command -v npm >/dev/null 2>&1; then
-  echo -e "  ${CYAN}[npm]${NC} 프론트엔드 의존성 설치 (npm install)..."
-  (cd "$ROOT" && npm install)
+  echo -e "  ${CYAN}[npm]${NC} 프론트엔드 의존성 설치 (npm ci)..."
+  (cd "$ROOT" && npm ci)
+elif [ "$(uname -s)" = Linux ] && command -v podman >/dev/null 2>&1 && podman image exists localhost/ssh-editor-dev:bookworm; then
+  bash "$ROOT/scripts/linux-container.sh" npm ci
+else
+  echo "Node.js 22 이상과 npm을 설치한 뒤 다시 실행하세요." >&2
+  exit 1
 fi
 
 echo ""

@@ -4,6 +4,13 @@
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+[ ! -f "$HOME/.cargo/env" ] || . "$HOME/.cargo/env"
+if [ "$(uname -s)" = Linux ] && ! pkg-config --exists webkit2gtk-4.1 2>/dev/null; then
+  if command -v podman >/dev/null 2>&1 && podman image exists localhost/ssh-editor-dev:bookworm; then
+    echo "호스트에 WebKitGTK 4.1이 없어 Podman 개발 환경을 점검합니다."
+    exec bash "$ROOT/scripts/linux-container.sh" bash scripts/check-env.sh
+  fi
+fi
 
 GREEN='\033[0;32m'; RED='\033[0;31m'; YELLOW='\033[0;33m'; CYAN='\033[0;36m'; NC='\033[0m'
 ok=1
@@ -24,7 +31,7 @@ echo -e "${CYAN}==== SSH Editor - macOS/Linux 빌드 환경 점검 ====${NC}"
 echo ""
 
 check 'Rust (cargo)' cargo '--version' 'rustup: https://rustup.rs'
-check 'Node.js'      node  '--version' 'brew install node'
+check 'Node.js'      node  '--version' 'Node.js 22+ 설치: https://nodejs.org/'
 check 'npm'          npm   '--version' 'Node.js와 함께 설치됨'
 
 # macOS: Xcode Command Line Tools (clang/codesign)
@@ -38,11 +45,25 @@ if [ "$(uname -s)" = "Darwin" ]; then
   check 'codesign' codesign '' 'Xcode CLT에 포함'
 fi
 
+if [ "$(uname -s)" = Linux ]; then
+  check 'C compiler' cc '--version' 'make env-setup'
+  check 'C++ compiler' c++ '--version' 'make env-setup'
+  check 'pkg-config' pkg-config '--version' 'make env-setup'
+  for lib in gtk+-3.0 webkit2gtk-4.1 javascriptcoregtk-4.1 libsoup-3.0 openssl; do
+    if pkg-config --exists "$lib" 2>/dev/null; then
+      printf "  ${GREEN}[OK]${NC}   %-24s %s\n" "$lib" "$(pkg-config --modversion "$lib")"
+    else
+      printf "  ${RED}[MISS]${NC} %-24s make env-setup\n" "$lib"
+      ok=0
+    fi
+  done
+fi
+
 echo ""
 if [ "$ok" = "1" ]; then
   echo -e "${GREEN}==> 빌드 가능. 'npm run native' (개발/실행) / 'npm run native:release' (배포)${NC}"
   exit 0
 else
-  echo -e "${RED}==> 누락 도구 있음. 'make setup' 실행 후 다시 점검하세요.${NC}"
+  echo -e "${RED}==> 누락 도구 있음. 'make env-setup' 실행 후 다시 점검하세요.${NC}"
   exit 1
 fi

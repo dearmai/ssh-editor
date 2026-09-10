@@ -108,7 +108,12 @@ native: build
 
 verify:
 	npm run build
-	cd src-tauri && cargo check
+	@if [ "$(PLATFORM)" = linux ] && ! pkg-config --exists webkit2gtk-4.1; then \
+		bash scripts/linux-container.sh cargo check --locked --manifest-path src-tauri/Cargo.toml; \
+	else \
+		if [ -f "$$HOME/.cargo/env" ]; then . "$$HOME/.cargo/env"; fi; \
+		cd src-tauri && cargo check --locked; \
+	fi
 
 clean:
 	rm -rf build src-tauri/target dist
