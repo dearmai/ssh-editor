@@ -6,6 +6,9 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
+if [ "$(uname -s)" = Linux ]; then
+  exec bash "$ROOT/scripts/install-linux.sh"
+fi
 APP_NAME="SSH Editor"
 DEST="/Applications"
 

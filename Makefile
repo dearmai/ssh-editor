@@ -91,7 +91,7 @@ env-setup:
 deps:
 	npm install
 
-# .app 빌드 후 /Applications 에 설치
+# macOS: /Applications / Linux: 사용자 홈에 바이너리와 앱 메뉴 설치
 install: deps
 	@bash scripts/install-app.sh
 
@@ -130,7 +130,7 @@ help:
 	@echo "  make env-check   개발 도구 설치 여부 점검"
 	@echo "  make env-setup   개발 도구 자동 설치"
 	@echo "  make deps        npm 의존성 설치"
-	@echo "  make install     빌드 후 설치 (mac: /Applications)"
+	@echo "  make install     빌드 후 설치 (mac: /Applications, Linux: ~/.local)"
 	@echo "  make dev         개발 모드 실행"
 	@echo "  make build       배포 빌드 (설치파일/번들 생성)"
 	@echo "  make setup       make install 별칭 (하위호환)"

@@ -3,6 +3,11 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 IMAGE="localhost/ssh-editor-dev:bookworm"
+RUNTIME=0
+if [ "${1:-}" = --runtime ]; then
+  RUNTIME=1
+  shift
+fi
 
 if ! command -v podman >/dev/null 2>&1; then
   echo "Podman을 먼저 설치하세요 (Rocky/Fedora: sudo dnf install podman)." >&2
@@ -15,7 +20,7 @@ fi
 if ! podman image exists "$IMAGE"; then
   bash "$0" setup
 fi
-if [ ! -x "$HOME/.cargo/bin/rustup" ]; then
+if [ "$RUNTIME" = 0 ] && [ ! -x "$HOME/.cargo/bin/rustup" ]; then
   echo "Rust가 필요합니다. 먼저 make env-setup을 실행하세요." >&2
   exit 1
 fi
@@ -25,9 +30,11 @@ args=(--rm --userns=keep-id --security-opt label=disable --network host
   --volume ssh-editor-linux-home:/home/dev:U
   --volume "$ROOT:/workspace"
   --volume /etc/localtime:/etc/localtime:ro
-  --volume "$HOME/.cargo:/home/dev/.cargo"
-  --volume "$HOME/.rustup:/home/dev/.rustup:ro"
   --env CARGO_TARGET_DIR=/workspace/src-tauri/target/linux-container)
+if [ "$RUNTIME" = 0 ]; then
+  args+=(--volume "$HOME/.cargo:/home/dev/.cargo"
+    --volume "$HOME/.rustup:/home/dev/.rustup:ro")
+fi
 if [ -n "${DISPLAY:-}" ]; then
   args+=(--env "DISPLAY=$DISPLAY" --volume /tmp/.X11-unix:/tmp/.X11-unix:ro)
   auth="${XAUTHORITY:-$HOME/.Xauthority}"

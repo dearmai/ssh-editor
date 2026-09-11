@@ -48,7 +48,18 @@ npm install
 make env-setup        # 시스템 개발 패키지, Rust, npm 의존성 설치
 make env-check        # 실제 빌드 환경 점검
 make dev              # 프론트엔드 + Rust debug 빌드 후 GUI 실행
+make install          # release 빌드 후 사용자 계정에 설치 (sudo 불필요)
 ```
+
+`make install`은 Linux에서 바이너리를 `~/.local/share/ssh-editor/`, 실행기를
+`~/.local/bin/ssh-editor`, 앱 메뉴 항목을 `~/.local/share/applications/`에 설치합니다.
+`XDG_DATA_HOME`을 설정했다면 데이터 및 앱 메뉴는 해당 경로를 사용합니다.
+설치 후 앱 메뉴에서 **SSH Editor**를 선택하거나 `~/.local/bin/ssh-editor`를 실행하세요.
+Rocky 9에서는 설치된 실행기가 Podman을 사용하며, 프로젝트 폴더와 Rust 개발 도구 없이도
+실행할 수 있습니다. 기존 컨테이너의 앱 설정은 유지됩니다.
+로컬 설치는 release 바이너리를 사용하고, 배포용 DEB/RPM/AppImage 생성은
+별도로 `npm run native:bundle`을 사용합니다. 기존 Podman 이미지의 번들 의존성을
+갱신하려면 `bash scripts/linux-container.sh setup`을 실행하세요.
 
 Ubuntu/Debian 및 Fedora에서는 배포판 개발 패키지를 설치합니다.
 Rocky/RHEL 9는 저장소에 WebKitGTK 4.1이 없으므로 **Podman의 Debian Bookworm 환경**을 자동으로 사용합니다.
