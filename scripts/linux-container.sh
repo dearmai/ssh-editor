@@ -25,9 +25,15 @@ if [ "$RUNTIME" = 0 ] && [ ! -x "$HOME/.cargo/bin/rustup" ]; then
   exit 1
 fi
 
+DOWNLOADS="$(xdg-user-dir DOWNLOAD 2>/dev/null || true)"
+DOWNLOADS="${DOWNLOADS:-$HOME/Downloads}"
+mkdir -p "$DOWNLOADS"
+
 args=(--rm --userns=keep-id --security-opt label=disable --network host
   --shm-size=512m --env HOME=/home/dev
   --volume ssh-editor-linux-home:/home/dev:U
+  --volume "$DOWNLOADS:/home/dev/Downloads"
+  --volume "$ROOT/scripts/linux-user-dirs.dirs:/home/dev/.config/user-dirs.dirs:ro"
   --volume "$ROOT:/workspace"
   --volume /etc/localtime:/etc/localtime:ro
   --env CARGO_TARGET_DIR=/workspace/src-tauri/target/linux-container)

@@ -1,0 +1,2 @@
+# Container Downloads is bound to the host's XDG download directory.
+XDG_DOWNLOAD_DIR="$HOME/Downloads"

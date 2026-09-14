@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
+import { downloadDir, join } from '@tauri-apps/api/path';
 import {
   sftpAbortUploadData,
   sftpCheckWriteAccess,
@@ -226,7 +227,8 @@ export const useTransferStore = create<TransferStore>((set, get) => ({
   },
 
   downloadFile: async (sessionId, remotePath, name) => {
-    const localPath = await saveDialog({ defaultPath: name, title: '저장 위치 선택' });
+    const defaultPath = await downloadDir().then((dir) => join(dir, name)).catch(() => name);
+    const localPath = await saveDialog({ defaultPath, title: '저장 위치 선택' });
     if (!localPath) return;
     const id = crypto.randomUUID();
     runners.set(id, () => sftpDownload(sessionId, remotePath, localPath, id));
@@ -241,7 +243,8 @@ export const useTransferStore = create<TransferStore>((set, get) => ({
 
   downloadDir: async (sessionId, remotePath, name, format) => {
     const fileName = `${name}.${extFor(format)}`;
-    const localPath = await saveDialog({ defaultPath: fileName, title: '아카이브 저장 위치' });
+    const defaultPath = await downloadDir().then((dir) => join(dir, fileName)).catch(() => fileName);
+    const localPath = await saveDialog({ defaultPath, title: '아카이브 저장 위치' });
     if (!localPath) return;
     const id = crypto.randomUUID();
     runners.set(id, () => sftpDownloadDir(sessionId, remotePath, localPath, format, id));

@@ -18,7 +18,7 @@ mkdir -p "$APP_DIR/build/release" "$APP_DIR/scripts" "$BIN_DIR" "$DATA_DIR/appli
 install -m 755 "$ROOT/build/release/ssh-editor" "$APP_DIR/build/release/ssh-editor.new"
 mv -f "$APP_DIR/build/release/ssh-editor.new" "$APP_DIR/build/release/ssh-editor"
 install -m 644 "$ROOT/src-tauri/icons/128x128.png" "$APP_DIR/icon.png"
-install -m 644 "$ROOT/scripts/linux-container.sh" "$ROOT/scripts/Containerfile.linux" "$APP_DIR/scripts/"
+install -m 644 "$ROOT/scripts/linux-container.sh" "$ROOT/scripts/Containerfile.linux" "$ROOT/scripts/linux-user-dirs.dirs" "$APP_DIR/scripts/"
 
 {
   printf '#!/usr/bin/env bash\nset -euo pipefail\n'
