@@ -176,6 +176,8 @@ pub fn run(startup_args: Option<StartupArgs>) {
             // SFTP
             sftp_list_dir,
             sftp_read_file,
+            sftp_log_chunk,
+            sftp_log_search,
             sftp_write_file,
             sftp_stat,
             sftp_create_file,

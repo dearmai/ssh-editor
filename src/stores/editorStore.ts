@@ -211,8 +211,9 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 
     // 바이너리/대용량 검사 → 경고 다이얼로그
     const probe = await sftpProbe(connectionId, entry.path).catch(() => null);
-    if (probe && (probe.isBinary || probe.size >= LARGE_FILE_THRESHOLD)) {
-      set({ pendingOpen: { connectionId, entry, size: probe.size, isBinary: probe.isBinary } });
+    const size = probe?.size ?? entry.size;
+    if ((probe?.isBinary ?? false) || size >= LARGE_FILE_THRESHOLD) {
+      set({ pendingOpen: { connectionId, entry, size, isBinary: probe?.isBinary ?? false } });
       return;
     }
 
@@ -228,7 +229,11 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       return;
     }
     try {
-      await performOpen(set, p.connectionId, p.entry);
+      if (p.size >= LARGE_FILE_THRESHOLD) {
+        openViewerTab(set, p.connectionId, p.entry);
+      } else {
+        await performOpen(set, p.connectionId, p.entry);
+      }
     } catch (e) {
       log.error(`열기 실패: ${p.entry.path} — ${e}`);
     }
@@ -314,7 +319,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 
   saveTab: async (tabId) => {
     const tab = get().tabsById[tabId];
-    if (!tab) return;
+    if (!tab || tab.viewMode) return;
     try {
       const stat = await sftpStat(tab.connectionId, tab.remotePath).catch(() => null);
       const changedExternally =
@@ -393,7 +398,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   checkExternalChange: async (tabId) => {
     if (get().externalChange || get().conflict) return;
     const tab = get().tabsById[tabId];
-    if (!tab || tab.baseMtime == null) return;
+    if (!tab || tab.viewMode || tab.baseMtime == null) return;
 
     const stat = await sftpStat(tab.connectionId, tab.remotePath).catch(() => null);
     if (!stat) return;
@@ -702,4 +707,22 @@ async function performOpen(set: SetFn, connectionId: string, entry: FileEntry) {
     log.error(`파일 열기 실패: ${entry.path} — ${e}`);
     throw e;
   }
+}
+
+function openViewerTab(set: SetFn, connectionId: string, entry: FileEntry) {
+  const tabId = makeTabId(connectionId, entry.path);
+  const tab: EditorTab = {
+    id: tabId, connectionId, remotePath: entry.path, fileName: entry.name,
+    content: '', isDirty: false, language: 'plaintext', viewMode: true,
+  };
+  set((s) => {
+    const active = s.groupsById[s.activeGroupId];
+    return {
+      tabsById: { ...s.tabsById, [tabId]: tab },
+      groupsById: {
+        ...s.groupsById,
+        [s.activeGroupId]: { ...active, tabIds: [...active.tabIds, tabId], activeTabId: tabId },
+      },
+    };
+  });
 }

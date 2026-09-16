@@ -1,7 +1,69 @@
 use crate::error::{AppError, AppResult};
-use crate::ssh::{sftp, transfer, FileEntry, FileStat, ProbeResult, SshConnectionPool, TransferCancelState};
+use crate::ssh::connection::{run_command, shell_quote};
+use crate::ssh::{
+    sftp, transfer, FileEntry, FileStat, ProbeResult, SshConnectionPool, TransferCancelState,
+};
 use base64::Engine;
 use tauri::{AppHandle, State};
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LogChunk {
+    pub text: String,
+    pub offset: u64,
+    pub size: u64,
+}
+
+#[tauri::command]
+pub async fn sftp_log_chunk(
+    session_id: String,
+    path: String,
+    offset: Option<u64>,
+    pool: State<'_, SshConnectionPool>,
+) -> AppResult<LogChunk> {
+    let session = pool.get(&session_id)?;
+    let size = sftp::stat(&session, &path).await?.size;
+    let start = offset.unwrap_or_else(|| size.saturating_sub(256 * 1024));
+    let start = start.min(size);
+    let count = if offset.is_some() {
+        64 * 1024
+    } else {
+        256 * 1024
+    };
+    let cmd = format!(
+        "tail -c +{} -- {} | head -c {}",
+        start + 1,
+        shell_quote(&path),
+        count
+    );
+    let (bytes, _) = run_command(&session, &cmd).await?;
+    let end = (start + bytes.len() as u64).min(size);
+    Ok(LogChunk {
+        text: String::from_utf8_lossy(&bytes).into_owned(),
+        offset: end,
+        size,
+    })
+}
+
+#[tauri::command]
+pub async fn sftp_log_search(
+    session_id: String,
+    path: String,
+    query: String,
+    pool: State<'_, SshConnectionPool>,
+) -> AppResult<String> {
+    if query.trim().is_empty() {
+        return Ok(String::new());
+    }
+    let session = pool.get(&session_id)?;
+    let cmd = format!(
+        "grep -n -F -m 100 -- {} {} | cut -c 1-500 | head -c 65536",
+        shell_quote(&query),
+        shell_quote(&path)
+    );
+    let (bytes, _) = run_command(&session, &cmd).await?;
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
+}
 
 #[tauri::command]
 pub async fn sftp_list_dir(

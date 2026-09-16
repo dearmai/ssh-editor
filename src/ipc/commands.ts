@@ -58,6 +58,12 @@ export const sftpListDir = (sessionId: string, path: string) =>
 export const sftpReadFile = (sessionId: string, path: string) =>
   invoke<string>('sftp_read_file', { sessionId, path });
 
+export interface LogChunk { text: string; offset: number; size: number }
+export const sftpLogChunk = (sessionId: string, path: string, offset?: number) =>
+  invoke<LogChunk>('sftp_log_chunk', { sessionId, path, offset });
+export const sftpLogSearch = (sessionId: string, path: string, query: string) =>
+  invoke<string>('sftp_log_search', { sessionId, path, query });
+
 export const sftpWriteFile = (sessionId: string, path: string, content: string) =>
   invoke<FileStat>('sftp_write_file', { sessionId, path, content });
 

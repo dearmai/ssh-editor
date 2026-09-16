@@ -4,6 +4,7 @@ import { nodeKey, useEditorStore, type DropSide, type LayoutNode } from '../../s
 import EditorTabs from './EditorTabs';
 import MarkdownPreview from './MarkdownPreview';
 import MonacoPane from './MonacoPane';
+import LogViewer from './LogViewer';
 import WelcomeScreen from './WelcomeScreen';
 import styles from './EditorArea.module.css';
 
@@ -81,7 +82,9 @@ function GroupView({ groupId }: { groupId: string }) {
       {isActiveGroup && groupCount > 1 && <div className={styles.activeStrip} />}
       <EditorTabs group={group} groupCount={groupCount} />
       {group.activeTabId ? (
-        activeTab?.language === 'markdown' && activeTab.previewMode ? (
+        activeTab?.viewMode ? (
+          <LogViewer key={`${groupId}:${group.activeTabId}`} tabId={group.activeTabId} />
+        ) : activeTab?.language === 'markdown' && activeTab.previewMode ? (
           <MarkdownPreview key={`${groupId}:${group.activeTabId}:preview`} tabId={group.activeTabId} />
         ) : (
           <MonacoPane key={`${groupId}:${group.activeTabId}`} tabId={group.activeTabId} />

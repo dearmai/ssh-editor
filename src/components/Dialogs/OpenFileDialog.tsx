@@ -33,7 +33,7 @@ export default function OpenFileDialog() {
               <strong>{pending?.entry.name}</strong> ({formatSize(pending?.size ?? 0)})
               {isBinary
                 ? ' 은(는) 바이너리 파일로 보여 에디터에서 열 수 없습니다.'
-                : ' 은(는) 1MB가 넘는 큰 파일입니다. 에디터가 느려질 수 있습니다.'}
+                : ' 은(는) 1MB 이상인 큰 파일입니다. 최근 부분을 읽기 전용 보기 모드로 엽니다.'}
               {' 어떻게 처리할까요?'}
             </div>
 
@@ -48,8 +48,8 @@ export default function OpenFileDialog() {
 
               {!isBinary && (
                 <button className={styles.conflictBtn} onClick={() => resolveOpen('open')}>
-                  <span className={styles.conflictBtnTitle}>그래도 열기</span>
-                  <span className={styles.conflictBtnDesc}>에디터에서 강제로 엽니다</span>
+                  <span className={styles.conflictBtnTitle}>보기 모드로 열기</span>
+                  <span className={styles.conflictBtnDesc}>최근 로그를 보고 서버에서 검색하거나 tail 할 수 있습니다</span>
                 </button>
               )}
             </div>

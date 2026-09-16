@@ -66,6 +66,8 @@ export interface EditorTab {
   remotePath: string;
   fileName: string;
   content: string;
+  /** 큰 텍스트 파일은 서버에서 일부씩 읽는 보기 탭 */
+  viewMode?: boolean;
   isDirty: boolean;
   language: string;
   /** 마지막으로 읽거나 저장한 시점의 원격 파일 mtime/size (외부 변경 감지용) */
