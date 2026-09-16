@@ -37,6 +37,9 @@ args=(--rm --userns=keep-id --security-opt label=disable --network host
   --volume "$ROOT:/workspace"
   --volume /etc/localtime:/etc/localtime:ro
   --env CARGO_TARGET_DIR=/workspace/src-tauri/target/linux-container)
+if [ -d "$HOME/.ssh" ]; then
+  args+=(--volume "$HOME/.ssh:/home/dev/.ssh:ro")
+fi
 if [ "$RUNTIME" = 0 ]; then
   args+=(--volume "$HOME/.cargo:/home/dev/.cargo"
     --volume "$HOME/.rustup:/home/dev/.rustup:ro")

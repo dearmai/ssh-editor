@@ -85,8 +85,8 @@ Podman 볼륨 `ssh-editor-linux-home`에 보존됩니다.
 
 컨테이너 GUI 실행에는 X11 또는 XWayland의 `DISPLAY`와 X 인증 파일
 (`XAUTHORITY`, 기본값 `~/.Xauthority`)이 필요합니다. 실행 스크립트는 X 소켓과 인증 파일을
-연결하며, `SSH_AUTH_SOCK`이 있으면 SSH Agent도 연결합니다. 호스트의 `~/.ssh`는 자동으로
-공유하지 않으므로 SSH 키 인증은 Agent를 사용하거나 컨테이너에서 접근 가능한 키 경로를 지정하세요.
+연결하며, `SSH_AUTH_SOCK`이 있으면 SSH Agent도 연결합니다. 호스트의 `~/.ssh`가 있으면
+읽기 전용으로 연결하여 서버 추가 화면에서 `config`의 호스트를 제안합니다.
 Linux에서는 macOS의 ⌘ 단축키 대신 Ctrl을 사용합니다.
 
 컨테이너의 `~/Downloads`는 호스트의 다운로드 폴더(`xdg-user-dir DOWNLOAD`, 미설정 시
