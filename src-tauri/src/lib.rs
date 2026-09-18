@@ -2,6 +2,8 @@ mod commands;
 mod config;
 mod error;
 mod ssh;
+#[cfg(target_os = "linux")]
+mod webview_recovery;
 
 use commands::*;
 use serde::{Deserialize, Serialize};
@@ -49,7 +51,10 @@ fn start_exit_flow(app: &tauri::AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run(startup_args: Option<StartupArgs>) {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(target_os = "linux")]
+    let builder = builder.plugin(webview_recovery::plugin());
+    builder
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(
@@ -112,7 +117,9 @@ pub fn run(startup_args: Option<StartupArgs>) {
                 .maximize()
                 .build()?;
 
-            let view_menu = SubmenuBuilder::new(app, "보기").item(&word_wrap_item).build()?;
+            let view_menu = SubmenuBuilder::new(app, "보기")
+                .item(&word_wrap_item)
+                .build()?;
 
             let menu = MenuBuilder::new(app)
                 .item(&app_menu)

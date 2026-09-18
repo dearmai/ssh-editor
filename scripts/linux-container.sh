@@ -31,6 +31,9 @@ mkdir -p "$DOWNLOADS"
 
 args=(--rm --userns=keep-id --security-opt label=disable --network host
   --shm-size=512m --env HOME=/home/dev
+  # GPU 장치가 없는 컨테이너에서 Skia/Mesa swrast 충돌을 피한다.
+  --env WEBKIT_SKIA_ENABLE_CPU_RENDERING=1
+  --env WEBKIT_DISABLE_COMPOSITING_MODE=1
   --volume ssh-editor-linux-home:/home/dev:U
   --volume "$DOWNLOADS:/home/dev/Downloads"
   --volume "$ROOT/scripts/linux-user-dirs.dirs:/home/dev/.config/user-dirs.dirs:ro"

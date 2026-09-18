@@ -83,6 +83,11 @@ bash scripts/linux-container.sh /workspace/build/release/ssh-editor  # 재빌드
 컨테이너의 Rust 빌드 캐시는 `src-tauri/target/linux-container/`, 앱 설정은
 Podman 볼륨 `ssh-editor-linux-home`에 보존됩니다.
 
+컨테이너에서는 Mesa/Skia GPU 충돌을 피하도록 CPU 렌더링을 사용하고 가속 합성을
+비활성화합니다. Linux에서 WebKit 화면 프로세스가 비정상 종료되면 네이티브 오류
+안내를 표시하며, 확인하면 해당 창을 닫습니다. 다른 창은 유지되지만 충돌한 창의
+미저장 편집 내용은 복구되지 않을 수 있습니다.
+
 컨테이너 GUI 실행에는 X11 또는 XWayland의 `DISPLAY`와 X 인증 파일
 (`XAUTHORITY`, 기본값 `~/.Xauthority`)이 필요합니다. 실행 스크립트는 X 소켓과 인증 파일을
 연결하며, `SSH_AUTH_SOCK`이 있으면 SSH Agent도 연결합니다. 호스트의 `~/.ssh`가 있으면
