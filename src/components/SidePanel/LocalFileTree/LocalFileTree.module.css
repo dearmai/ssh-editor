@@ -1,0 +1,13 @@
+.panel { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.toolbar { display: flex; gap: 6px; padding: 8px; }
+.toolbar button, .entry { display: flex; align-items: center; gap: 5px; color: var(--text-primary); background: transparent; border: 0; cursor: pointer; font: inherit; }
+.toolbar button:hover, .entry:hover { background: var(--bg-hover); }
+.path { padding: 6px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); font-size: 11px; }
+.tree { flex: 1; overflow: auto; }
+.entry { width: 100%; padding: 4px 8px; text-align: left; }
+.entry span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.entry svg { flex-shrink: 0; }
+.selected { background: var(--bg-active); }
+.children { padding-left: 14px; }
+.spacer { width: 13px; flex-shrink: 0; }
+.error { padding: 8px; color: var(--text-secondary); overflow-wrap: anywhere; }

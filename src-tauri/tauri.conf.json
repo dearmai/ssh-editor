@@ -33,6 +33,251 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
+    ],
+    "fileAssociations": [
+      {
+        "ext": [
+          "txt",
+          "text",
+          "log",
+          "conf",
+          "cfg",
+          "ini",
+          "env"
+        ],
+        "name": "Text",
+        "role": "Editor",
+        "mimeType": "text/plain",
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "md",
+          "markdown",
+          "mdx"
+        ],
+        "name": "Markdown",
+        "role": "Editor",
+        "mimeType": "text/markdown",
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "json",
+          "jsonc",
+          "map"
+        ],
+        "name": "JSON",
+        "role": "Editor",
+        "mimeType": "application/json",
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "yaml",
+          "yml"
+        ],
+        "name": "YAML",
+        "role": "Editor",
+        "mimeType": "application/yaml",
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "toml"
+        ],
+        "name": "TOML",
+        "role": "Editor",
+        "mimeType": "application/toml",
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "xml",
+          "xsd",
+          "xsl",
+          "svg"
+        ],
+        "name": "XML",
+        "role": "Editor",
+        "mimeType": "application/xml",
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "html",
+          "htm",
+          "vue",
+          "svelte"
+        ],
+        "name": "HTML",
+        "role": "Editor",
+        "mimeType": "text/html",
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "css",
+          "scss",
+          "sass",
+          "less"
+        ],
+        "name": "CSS",
+        "role": "Editor",
+        "mimeType": "text/css",
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "js",
+          "jsx",
+          "mjs",
+          "cjs"
+        ],
+        "name": "JavaScript",
+        "role": "Editor",
+        "mimeType": "text/javascript",
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "ts",
+          "tsx",
+          "mts",
+          "cts"
+        ],
+        "name": "TypeScript",
+        "role": "Editor",
+        "mimeType": "text/x-typescript",
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "py",
+          "pyi",
+          "pyw"
+        ],
+        "name": "Python",
+        "role": "Editor",
+        "mimeType": "text/x-python",
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "sh",
+          "bash",
+          "zsh",
+          "fish"
+        ],
+        "name": "Shell",
+        "role": "Editor",
+        "mimeType": "application/x-shellscript",
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "c",
+          "h"
+        ],
+        "name": "C",
+        "role": "Editor",
+        "mimeType": "text/x-csrc",
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "cpp",
+          "cc",
+          "cxx",
+          "hpp",
+          "hxx"
+        ],
+        "name": "C++",
+        "role": "Editor",
+        "mimeType": "text/x-c++src",
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "rs"
+        ],
+        "name": "Rust",
+        "role": "Editor",
+        "mimeType": "text/rust",
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "go"
+        ],
+        "name": "Go",
+        "role": "Editor",
+        "mimeType": "text/x-go",
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "java"
+        ],
+        "name": "Java",
+        "role": "Editor",
+        "mimeType": "text/x-java",
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "rb"
+        ],
+        "name": "Ruby",
+        "role": "Editor",
+        "mimeType": "application/x-ruby",
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "php"
+        ],
+        "name": "PHP",
+        "role": "Editor",
+        "mimeType": "application/x-php",
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "sql"
+        ],
+        "name": "SQL",
+        "role": "Editor",
+        "mimeType": "application/sql",
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "kt",
+          "kts",
+          "cs",
+          "swift",
+          "lua",
+          "r",
+          "scala",
+          "tf",
+          "hcl",
+          "graphql",
+          "gql",
+          "caddy",
+          "caddyfile",
+          "dockerfile",
+          "ps1",
+          "bat",
+          "cmd",
+          "csv",
+          "tsv"
+        ],
+        "name": "Other source",
+        "role": "Editor",
+        "mimeType": "text/plain",
+        "rank": "Alternate"
+      }
     ]
   }
 }

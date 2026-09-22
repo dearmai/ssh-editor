@@ -3,9 +3,13 @@ import { useState } from 'react';
 import { useConnectionStore } from '../../stores/connectionStore';
 import NewConnectionDialog from '../Dialogs/NewConnectionDialog';
 import FileTreePanel from './FileTreePanel';
+import LocalFileTree from './LocalFileTree';
+import { useLocalWorkspaceStore } from '../../stores/localWorkspaceStore';
 import styles from './SidePanel.module.css';
 
 export default function SidePanel() {
+  const localActive = useLocalWorkspaceStore((s) => s.active);
+  const showLocal = useLocalWorkspaceStore((s) => s.show);
   const [showDialog, setShowDialog] = useState(false);
   const { activeConnections, selectedSessionId, disconnect, setSelectedSession } =
     useConnectionStore();
@@ -14,8 +18,12 @@ export default function SidePanel() {
 
   return (
     <div className={styles.panel}>
-      {/* 서버 헤더 */}
       <div className={styles.serverHeader}>
+        <button className={styles.modeBtn} aria-pressed={localActive} onClick={() => showLocal(true)}>로컬</button>
+        <button className={styles.modeBtn} aria-pressed={!localActive} onClick={() => showLocal(false)}>SSH</button>
+      </div>
+      {/* 서버 헤더 */}
+      {!localActive && <div className={styles.serverHeader}>
         {conn ? (
           <>
             <span
@@ -66,10 +74,10 @@ export default function SidePanel() {
             </button>
           </>
         )}
-      </div>
+      </div>}
 
       <div className={styles.content}>
-        <FileTreePanel />
+        {localActive ? <LocalFileTree /> : <FileTreePanel />}
       </div>
 
       <NewConnectionDialog open={showDialog} onClose={() => setShowDialog(false)} />

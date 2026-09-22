@@ -20,13 +20,13 @@ export default function ExternalChangeDialog() {
                 size={16}
                 style={{ verticalAlign: '-3px', marginRight: 6, color: '#dcdcaa' }}
               />
-              파일이 서버에서 변경됨
+              파일이 외부에서 변경됨
             </Dialog.Title>
           </div>
 
           <div className={styles.form}>
             <div className={styles.conflictMsg}>
-              <strong>{ec?.fileName}</strong> 파일이 이 에디터에서 연 이후 서버에서 변경되었습니다.
+              <strong>{ec?.fileName}</strong> 파일이 이 에디터에서 연 이후 외부에서 변경되었습니다.
               {ec?.isDirty
                 ? ' 편집 중인 내용이 있어 재로드하면 사라집니다. 어떻게 할까요?'
                 : ' 어떻게 할까요?'}
@@ -36,10 +36,10 @@ export default function ExternalChangeDialog() {
               <button className={styles.conflictBtn} onClick={() => resolveExternalChange('reload')}>
                 <span className={styles.conflictBtnTitle}>
                   <RefreshCw size={13} style={{ verticalAlign: '-2px', marginRight: 4 }} />
-                  서버 버전으로 재로드
+                  최신 버전으로 재로드
                 </span>
                 <span className={styles.conflictBtnDesc}>
-                  서버의 최신 내용을 불러옵니다{ec?.isDirty ? ' (편집 중인 내용은 버려짐)' : ''}
+                  파일의 최신 내용을 불러옵니다{ec?.isDirty ? ' (편집 중인 내용은 버려짐)' : ''}
                 </span>
               </button>
 
@@ -49,7 +49,7 @@ export default function ExternalChangeDialog() {
                   백업 후 재로드
                 </span>
                 <span className={styles.conflictBtnDesc}>
-                  내 현재 내용을 <code>.bak.타임스탬프</code> 로 저장한 뒤 서버 버전을 불러옵니다
+                  내 현재 내용을 <code>.bak.타임스탬프</code> 로 저장한 뒤 최신 버전을 불러옵니다
                 </span>
               </button>
             </div>

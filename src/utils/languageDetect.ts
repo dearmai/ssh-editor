@@ -72,7 +72,7 @@ const SHELL_CONFIG_FILES = new Set([
 ]);
 
 export function detectLanguage(filePath: string): string {
-  const fileName = filePath.split('/').pop() ?? '';
+  const fileName = filePath.replace(/\\/g, '/').split('/').pop() ?? '';
   const lower = fileName.toLowerCase();
 
   // 특수 파일명 처리

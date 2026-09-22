@@ -209,6 +209,11 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       return;
     }
 
+    if (connectionId === 'local') {
+      await performOpen(set, connectionId, entry);
+      return;
+    }
+
     // 바이너리/대용량 검사 → 경고 다이얼로그
     const probe = await sftpProbe(connectionId, entry.path).catch(() => null);
     const size = probe?.size ?? entry.size;
@@ -661,6 +666,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 }));
 
 function refreshParent(connectionId: string, path: string) {
+  if (connectionId === 'local') return;
   const parent = path.split('/').slice(0, -1).join('/') || '/';
   useFileTreeStore.getState().refreshDir(connectionId, parent).catch(() => {});
 }

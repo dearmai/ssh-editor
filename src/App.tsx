@@ -28,7 +28,7 @@ import ExternalChangeDialog from './components/Dialogs/ExternalChangeDialog';
 import ThemePicker from './components/ThemePicker';
 import LanguageStatus from './components/LanguageStatus';
 import IndentStatus from './components/IndentStatus';
-import { exitVote, getStartupArgs, openNewWindow, sshPing } from './ipc/commands';
+import { exitVote, takeOpenFiles, getStartupArgs, openNewWindow, sshPing } from './ipc/commands';
 import { onTransferProgress } from './ipc/events';
 import { confirmUnsavedChanges } from './utils/confirmUnsavedChanges';
 import { useConnectionStore } from './stores/connectionStore';
@@ -44,6 +44,8 @@ import {
 } from './stores/settingsStore';
 import { applyColorTheme, getTheme } from './themes';
 import { log } from './stores/logStore';
+import { useLocalWorkspaceStore } from './stores/localWorkspaceStore';
+import { toastError } from './stores/toastStore';
 import type { PingInfo } from './types';
 import styles from './App.module.css';
 
@@ -120,9 +122,11 @@ export default function App() {
   );
 
   const conn = activeConnections.find((c) => c.sessionId === selectedSessionId);
-  const profileId = conn?.profile.id;
-  const folderPath = selectedSessionId ? rootPaths.get(selectedSessionId) : undefined;
-  const profileName = conn?.profile.name;
+  const localActive = useLocalWorkspaceStore((s) => s.active);
+  const localRoot = useLocalWorkspaceStore((s) => s.root);
+  const profileId = localActive ? undefined : conn?.profile.id;
+  const folderPath = localActive ? localRoot ?? undefined : selectedSessionId ? rootPaths.get(selectedSessionId) : undefined;
+  const profileName = localActive ? localRoot : conn?.profile.name;
 
   // 타이틀바에 현재 선택된 서버 이름 표시 (창마다 독립적)
   useEffect(() => {
@@ -149,6 +153,29 @@ export default function App() {
       unlistenTransfer.then((fn) => fn());
     };
   }, [loadAll]);
+
+  // 먼저 이벤트를 구독한 뒤 시작 시 대기 중인 파일을 가져온다.
+  useEffect(() => {
+    if (getCurrentWindow().label !== 'main') return;
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    let queue = Promise.resolve();
+    const drain = () => {
+      queue = queue.then(async () => {
+        if (disposed) return;
+        for (const path of await takeOpenFiles()) {
+          try { await useLocalWorkspaceStore.getState().openFile(path); }
+          catch (e) { toastError(`파일 열기 실패: ${path} — ${e}`); }
+        }
+      }).catch((e) => toastError(`파일 열기 실패: ${e}`));
+    };
+    listen('open-files-available', drain).then((fn) => {
+      if (disposed) { fn(); return; }
+      unlisten = fn;
+      drain();
+    }).catch((e) => toastError(String(e)));
+    return () => { disposed = true; unlisten?.(); };
+  }, []);
 
   // 창 복귀(포커스/가시성 전환) 시 연결 생존 점검 → 끊김 감지/재접속 흐름
   useEffect(() => {

@@ -23,7 +23,7 @@ export default function SaveConflictDialog() {
 
           <div className={styles.form}>
             <div className={styles.conflictMsg}>
-              <strong>{conflict?.fileName}</strong> 파일이 이 에디터에서 연 이후 서버에서 변경되었습니다.
+              <strong>{conflict?.fileName}</strong> 파일이 이 에디터에서 연 이후 외부에서 변경되었습니다.
               지금 저장하면 변경 사항을 덮어쓸 수 있습니다. 어떻게 처리할까요?
             </div>
 
@@ -34,7 +34,7 @@ export default function SaveConflictDialog() {
               >
                 <span className={styles.conflictBtnTitle}>백업 후 덮어쓰기 (권장)</span>
                 <span className={styles.conflictBtnDesc}>
-                  서버의 현재 파일을 <code>.bak.타임스탬프</code> 로 백업한 뒤 내 내용으로 저장
+                  현재 파일을 <code>.bak.타임스탬프</code> 로 백업한 뒤 내 내용으로 저장
                 </span>
               </button>
 
@@ -53,7 +53,7 @@ export default function SaveConflictDialog() {
                 onClick={() => resolveConflict('overwrite')}
               >
                 <span className={styles.conflictBtnTitle}>그냥 덮어쓰기</span>
-                <span className={styles.conflictBtnDesc}>서버의 변경 사항을 버리고 내 내용으로 덮어씀</span>
+                <span className={styles.conflictBtnDesc}>외부 변경 사항을 버리고 내 내용으로 덮어씀</span>
               </button>
             </div>
 

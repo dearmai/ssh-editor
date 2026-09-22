@@ -57,6 +57,28 @@ fi
 if [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "$SSH_AUTH_SOCK" ]; then
   args+=(--env SSH_AUTH_SOCK=/tmp/ssh-agent --volume "$SSH_AUTH_SOCK:/tmp/ssh-agent")
 fi
+# 파일 연결로 받은 호스트 경로를 컨테이너에서도 같은 절대 경로로 접근한다.
+# 상위 폴더를 마운트해야 파일을 연 뒤 형제 파일 탐색/저장이 가능하다.
+if [ "$RUNTIME" = 1 ] && [ "$#" -gt 1 ]; then
+  runtime_args=("$1")
+  shift
+  declare -A mounted_dirs=()
+  for file_arg in "$@"; do
+    if [[ "$file_arg" == file://* ]]; then
+      file_arg="$(python3 -c 'import sys, urllib.parse; print(urllib.parse.unquote(urllib.parse.urlparse(sys.argv[1]).path))' "$file_arg")"
+    fi
+    if [ -f "$file_arg" ]; then
+      file_arg="$(realpath -- "$file_arg")"
+      file_dir="$(dirname -- "$file_arg")"
+      if [ -z "${mounted_dirs[$file_dir]:-}" ]; then
+        args+=(--volume "$file_dir:$file_dir")
+        mounted_dirs[$file_dir]=1
+      fi
+    fi
+    runtime_args+=("$file_arg")
+  done
+  set -- "${runtime_args[@]}"
+fi
 if [ "$#" -eq 0 ]; then
   set -- npm run native
 fi

@@ -80,3 +80,14 @@
   flex: 1;
   overflow: hidden;
 }
+
+.modeBtn {
+  padding: 4px 12px;
+  border-radius: 3px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.modeBtn:hover, .modeBtn[aria-pressed='true'] {
+  color: var(--text-primary);
+  background: var(--bg-active);
+}

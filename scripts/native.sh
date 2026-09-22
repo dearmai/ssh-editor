@@ -91,6 +91,20 @@ make_app_bundle() {
 </dict>
 </plist>
 PLIST
+  # 정식 번들과 같은 확장자 연결 정보를 개발용 .app에도 반영한다.
+  python3 - "$app/Contents/Info.plist" <<'PYPLIST'
+import json, plistlib, sys
+with open(sys.argv[1], 'rb') as f:
+    plist = plistlib.load(f)
+with open('src-tauri/tauri.conf.json') as f:
+    associations = json.load(f)['bundle']['fileAssociations']
+plist['CFBundleDocumentTypes'] = [
+    dict(CFBundleTypeExtensions=a['ext'], CFBundleTypeName=a['name'],
+         CFBundleTypeRole=a['role'], LSHandlerRank=a['rank']) for a in associations
+]
+with open(sys.argv[1], 'wb') as f:
+    plistlib.dump(plist, f)
+PYPLIST
   # 로컬 실행용 ad-hoc 서명 (실패해도 진행)
   codesign --force --sign - "$app" >/dev/null 2>&1 || true
 }

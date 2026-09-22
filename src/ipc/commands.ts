@@ -56,7 +56,7 @@ export const sftpListDir = (sessionId: string, path: string) =>
   invoke<FileEntry[]>('sftp_list_dir', { sessionId, path });
 
 export const sftpReadFile = (sessionId: string, path: string) =>
-  invoke<string>('sftp_read_file', { sessionId, path });
+  invoke<string>(sessionId === 'local' ? 'local_read_file' : 'sftp_read_file', { sessionId, path });
 
 export interface LogChunk { text: string; offset: number; size: number }
 export const sftpLogChunk = (sessionId: string, path: string, offset?: number) =>
@@ -65,10 +65,10 @@ export const sftpLogSearch = (sessionId: string, path: string, query: string) =>
   invoke<string>('sftp_log_search', { sessionId, path, query });
 
 export const sftpWriteFile = (sessionId: string, path: string, content: string) =>
-  invoke<FileStat>('sftp_write_file', { sessionId, path, content });
+  invoke<FileStat>(sessionId === 'local' ? 'local_write_file' : 'sftp_write_file', { sessionId, path, content });
 
 export const sftpStat = (sessionId: string, path: string) =>
-  invoke<FileStat>('sftp_stat', { sessionId, path });
+  invoke<FileStat>(sessionId === 'local' ? 'local_stat' : 'sftp_stat', { sessionId, path });
 
 export const sftpCreateFile = (sessionId: string, path: string) =>
   invoke<void>('sftp_create_file', { sessionId, path });
@@ -166,3 +166,7 @@ export const terminalClose = (terminalId: string) =>
 // --- CLI ---
 export const getStartupArgs = () =>
   invoke<StartupArgs | null>('get_startup_args');
+
+// --- 로컬 작업 폴더 / 운영체제 파일 연결 ---
+export const takeOpenFiles = () => invoke<string[]>('take_open_files');
+export const localListDir = (path: string) => invoke<FileEntry[]>('local_list_dir', { path });

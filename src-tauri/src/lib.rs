@@ -1,6 +1,8 @@
 mod commands;
 mod config;
 mod error;
+mod local_files;
+use local_files::*;
 mod ssh;
 #[cfg(target_os = "linux")]
 mod webview_recovery;
@@ -67,6 +69,9 @@ pub fn run(startup_args: Option<StartupArgs>) {
         .manage(TerminalPool::new())
         .manage(ssh::TransferCancelState::new())
         .manage(StartupArgsState(Mutex::new(startup_args)))
+        .manage(PendingFiles(Mutex::new(cli_files(
+            std::env::args().skip(1),
+        ))))
         .manage(ExitVoteState(Mutex::new(None)))
         .setup(|app| {
             let prefs_item = MenuItemBuilder::with_id("preferences", "환경설정...")
@@ -207,6 +212,11 @@ pub fn run(startup_args: Option<StartupArgs>) {
             terminal_close,
             terminal_resize,
             // 기타
+            take_open_files,
+            local_read_file,
+            local_write_file,
+            local_stat,
+            local_list_dir,
             get_startup_args,
             read_clipboard_uploads,
             exit_vote,
@@ -214,6 +224,20 @@ pub fn run(startup_args: Option<StartupArgs>) {
         .build(tauri::generate_context!())
         .expect("SSH Editor 실행 오류")
         .run(|app, event| {
+            #[cfg(any(target_os = "macos", target_os = "ios"))]
+            if let tauri::RunEvent::Opened { urls } = &event {
+                let files = urls
+                    .iter()
+                    .filter_map(|url| url.to_file_path().ok())
+                    .map(|p| p.to_string_lossy().replace('\\', "/"))
+                    .collect::<Vec<_>>();
+                app.state::<PendingFiles>().0.lock().unwrap().extend(files);
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                    let _ = app.emit_to("main", "open-files-available", ());
+                }
+            }
             // Cmd+Q(앱 종료)는 창 close 이벤트를 거치지 않는다. 종료를 일단 막고
             // 프론트에 알려 미저장 문서를 저장·확인하게 한 뒤, confirm_exit 로 다시 종료한다.
             if let tauri::RunEvent::ExitRequested { api, code, .. } = &event {

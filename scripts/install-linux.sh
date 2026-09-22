@@ -44,11 +44,12 @@ cat > "$DATA_DIR/applications/io.rinjae.ssh-editor.desktop" <<EOF
 Type=Application
 Name=SSH Editor
 Comment=SSH remote file editor
-Exec="$(desktop_exec "$BIN_DIR/ssh-editor")"
+Exec="$(desktop_exec "$BIN_DIR/ssh-editor")" %F
 Icon=$(desktop_string "$APP_DIR/icon.png")
 Terminal=false
 Categories=Development;TextEditor;
 StartupWMClass=Ssh-editor
+MimeType=$(node -e 'const c=require("./src-tauri/tauri.conf.json"); process.stdout.write([...new Set(c.bundle.fileAssociations.map(a=>a.mimeType))].join(";")+";")')
 EOF
 if command -v update-desktop-database >/dev/null 2>&1; then
   update-desktop-database "$DATA_DIR/applications"
