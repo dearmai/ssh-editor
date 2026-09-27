@@ -1,9 +1,11 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { AlertTriangle } from 'lucide-react';
+import { useRef } from 'react';
 import { useConfirmStore } from '../../stores/confirmStore';
 import styles from './Dialog.module.css';
 
 export default function ConfirmDialog() {
+  const confirmButtonRef = useRef<HTMLButtonElement>(null);
   const current = useConfirmStore((s) => s.current);
   const respond = useConfirmStore((s) => s.respond);
 
@@ -13,7 +15,15 @@ export default function ConfirmDialog() {
     <Dialog.Root open={open} onOpenChange={(o) => !o && respond(false)}>
       <Dialog.Portal>
         <Dialog.Overlay className={styles.overlay} />
-        <Dialog.Content className={`${styles.content} ${current?.wide ? styles.wideContent : ''}`}>
+        <Dialog.Content
+          className={`${styles.content} ${current?.wide ? styles.wideContent : ''}`}
+          onOpenAutoFocus={(event) => {
+            if (current?.focusConfirm) {
+              event.preventDefault();
+              confirmButtonRef.current?.focus();
+            }
+          }}
+        >
           <div className={styles.header}>
             <Dialog.Title className={styles.title}>
               <AlertTriangle
@@ -28,10 +38,11 @@ export default function ConfirmDialog() {
             <div className={styles.conflictMsg}>{current?.message}</div>
 
             <div className={styles.buttons}>
-              <button className={styles.cancelBtn} onClick={() => respond(false)} autoFocus>
+              <button className={styles.cancelBtn} onClick={() => respond(false)} autoFocus={!current?.focusConfirm}>
                 {current?.cancelLabel ?? '취소'}
               </button>
               <button
+                ref={confirmButtonRef}
                 className={`${styles.submitBtn} ${current?.danger ? styles.dangerBtn : ''}`}
                 onClick={() => respond(true)}
               >

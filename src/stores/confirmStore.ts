@@ -6,6 +6,8 @@ export interface ConfirmOptions {
   message: ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
+  /** 확인 버튼에 초기 포커스를 두어 Enter로 진행한다. 기본값은 취소. */
+  focusConfirm?: boolean;
   /** 이미지 등 넓은 미리보기가 필요한 확인창 */
   wide?: boolean;
   /** 위험 동작(삭제 등)이면 확인 버튼을 빨간색으로 */

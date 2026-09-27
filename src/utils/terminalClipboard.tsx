@@ -38,11 +38,12 @@ export function createTerminalClipboard(target: Target) {
       const approved = await confirm({
         title: '터미널에 이미지 붙여넣기',
         wide: true,
+        focusConfirm: true,
         message: <>
           <UploadPreview items={items} remoteDir="이 터미널의 SSH 서버 · /tmp/ssh-editor-…" collisions={[]} />
           <p>이미지를 업로드한 뒤 원격 경로를 입력합니다. 설명을 추가하고 Enter로 전송하세요.</p>
         </>,
-        confirmLabel: '업로드 후 경로 입력',
+        confirmLabel: '업로드 후 경로 입력 (Enter)',
       });
       if (!approved || !target.isAlive()) return;
       target.setUploading(true);
