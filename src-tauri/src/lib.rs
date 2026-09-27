@@ -211,6 +211,7 @@ pub fn run(startup_args: Option<StartupArgs>) {
             terminal_write,
             terminal_close,
             terminal_resize,
+            terminal_prepare_upload,
             // 기타
             take_open_files,
             local_read_file,

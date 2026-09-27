@@ -3,14 +3,15 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { Terminal, type ITheme } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { onTerminalData } from '../../../ipc/events';
 import { terminalWrite, terminalResize } from '../../../ipc/commands';
 import { log } from '../../../stores/logStore';
 import { useSettingsStore } from '../../../stores/settingsStore';
 import { useTerminalStore } from '../../../stores/terminalStore';
 import { getTheme } from '../../../themes';
-import { decodeOsc52Base64, readClipboard, writeClipboard } from '../../../utils/clipboard';
+import { decodeOsc52Base64, writeClipboard } from '../../../utils/clipboard';
+import { createTerminalClipboard } from '../../../utils/terminalClipboard';
 import { TerminalViewport } from '../../../utils/terminalViewport';
 import { createTerminalLinkOpener } from '../../../utils/terminalLinks';
 import { handleTerminalMultilineKey } from '../../../utils/terminalKeyboard';
@@ -24,7 +25,8 @@ interface Props {
   visible?: boolean;
 }
 
-export default function TerminalPane({ sessionId, connectionId: _connectionId, visible = true }: Props) {
+export default function TerminalPane({ sessionId, connectionId, visible = true }: Props) {
+  const [uploadingImage, setUploadingImage] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const viewportRef = useRef<TerminalViewport | null>(null);
@@ -123,6 +125,25 @@ export default function TerminalPane({ sessionId, connectionId: _connectionId, v
     const viewport = new TerminalViewport(term);
     viewportRef.current = viewport;
     let disposed = false;
+    setUploadingImage(false);
+    const pasteClipboard = createTerminalClipboard({
+      connectionId,
+      isAlive: () => !disposed,
+      setUploading: setUploadingImage,
+      paste: (text) => {
+        term.paste(text);
+        if (visibleRef.current) term.focus();
+      },
+    });
+    // 브라우저의 붙여넣기 메뉴로 들어온 이미지도 xterm의 텍스트 처리 전에 받는다.
+    const onPaste = (event: ClipboardEvent) => {
+      const files = Array.from(event.clipboardData?.files ?? []);
+      if (!files.length) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      void pasteClipboard(files);
+    };
+    container.addEventListener('paste', onPaste, true);
     let restoreFrame = 0;
     let revision = 0;
     const canMeasure = () => !disposed && visibleRef.current
@@ -232,14 +253,7 @@ export default function TerminalPane({ sessionId, connectionId: _connectionId, v
       }
 
       if (key === 'v') {
-        void readClipboard()
-          .then((text) => {
-            if (!text) return;
-            term.paste(text);
-          })
-          .catch((err) => {
-            log.error(`클립보드 붙여넣기 실패: ${String(err)}`);
-          });
+        void pasteClipboard();
         e.preventDefault();
         return false;
       }
@@ -249,6 +263,7 @@ export default function TerminalPane({ sessionId, connectionId: _connectionId, v
 
     return () => {
       disposed = true;
+      container.removeEventListener('paste', onPaste, true);
       container.removeAttribute('title');
       cancelAnimationFrame(restoreFrame);
       unlistenPromise.then((f) => f());
@@ -260,7 +275,7 @@ export default function TerminalPane({ sessionId, connectionId: _connectionId, v
       measureRef.current = null;
       term.dispose();
     };
-  }, [sessionId]);
+  }, [sessionId, connectionId]);
 
   // 복귀 시 실제 크기로 재측정하고 터미널별로 보관한 스크롤 위치를 복원한다.
   useEffect(() => {
@@ -273,6 +288,7 @@ export default function TerminalPane({ sessionId, connectionId: _connectionId, v
 
   return (
     <div className={styles.wrapper}>
+      {uploadingImage && <div className={styles.uploadStatus} role="status">이미지 업로드 중…</div>}
       <div ref={containerRef} className={styles.terminal} />
     </div>
   );

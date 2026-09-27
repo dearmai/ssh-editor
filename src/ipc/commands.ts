@@ -148,6 +148,9 @@ export const sftpDownloadDir = (
 ) => invoke<void>('sftp_download_dir', { sessionId, remotePath, localPath, format, transferId });
 
 // --- 터미널 ---
+export const terminalPrepareUpload = (connectionId: string) =>
+  invoke<string>('terminal_prepare_upload', { connectionId });
+
 export const terminalCreate = (connectionId: string, cols: number, rows: number) =>
   invoke<string>('terminal_create', { connectionId, cols, rows });
 

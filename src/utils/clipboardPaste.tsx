@@ -23,7 +23,7 @@ async function browserItem(file: File): Promise<UploadItem> {
   return item;
 }
 
-async function readItems(files: File[]): Promise<UploadItem[]> {
+export async function readItems(files: File[]): Promise<UploadItem[]> {
   if (files.length) {
     const items: UploadItem[] = [];
     try {
@@ -48,7 +48,7 @@ async function readItems(files: File[]): Promise<UploadItem[]> {
   });
 }
 
-function releasePreviews(items: UploadItem[]) {
+export function releasePreviews(items: UploadItem[]) {
   for (const item of items) {
     if (item.thumbnail?.startsWith('blob:')) URL.revokeObjectURL(item.thumbnail);
   }

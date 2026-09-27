@@ -2,6 +2,24 @@ use crate::error::AppResult;
 use crate::ssh::{terminal, SshConnectionPool, TerminalPool};
 use tauri::{AppHandle, State};
 
+/// CLI가 읽을 이미지를 저장할 전용 디렉토리. 기존 PTY에는 명령을 보내지 않는다.
+#[tauri::command]
+pub async fn terminal_prepare_upload(
+    connection_id: String,
+    pool: State<'_, SshConnectionPool>,
+) -> AppResult<String> {
+    let session = pool.get(&connection_id)?;
+    let path = format!("/tmp/ssh-editor-{}", uuid::Uuid::new_v4());
+    let (_, status) = crate::ssh::run_command(
+        &session,
+        &format!("umask 077 && mkdir -- {}", crate::ssh::shell_quote(&path)),
+    ).await?;
+    if status != 0 {
+        return Err(crate::error::AppError::Other("이미지 업로드 디렉토리를 만들지 못했습니다".into()));
+    }
+    Ok(path)
+}
+
 #[tauri::command]
 pub async fn terminal_create(
     connection_id: String,

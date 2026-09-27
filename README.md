@@ -173,6 +173,7 @@ ssh-editor/
 - **⌘⇧N** — 새 창
 - **Shift+Enter** — SSH 터미널의 Codex / Claude Code CLI에서 줄바꿈 (일반 Enter는 전송)
 - **Alt/Option+Enter** — CLI의 대체 줄바꿈 단축키
+- **터미널에서 ⌘V / Ctrl+Shift+V** — 클립보드 이미지 미리보기 → 확인 후 SSH 서버에 업로드 → 원격 이미지 경로 입력. 설명을 추가하고 Enter로 CLI에 전송합니다. PNG/JPEG/WebP/GIF를 지원하며, 업로드 파일은 서버의 `/tmp/ssh-editor-*`에 보관됩니다(시스템 임시 파일 정리 시 삭제될 수 있음).
 - 파일 트리 우클릭 — 새 파일/폴더, 새로 고침, 삭제
 - 상태바 — 새 창 버튼, 테마 전환(서버·폴더별)
 
