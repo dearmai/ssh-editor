@@ -171,6 +171,8 @@ ssh-editor/
 - **⌘S** — 현재 파일 저장
 - **⌘,** — 환경설정
 - **⌘⇧N** — 새 창
+- **Shift+Enter** — SSH 터미널의 Codex / Claude Code CLI에서 줄바꿈 (일반 Enter는 전송)
+- **Alt/Option+Enter** — CLI의 대체 줄바꿈 단축키
 - 파일 트리 우클릭 — 새 파일/폴더, 새로 고침, 삭제
 - 상태바 — 새 창 버튼, 테마 전환(서버·폴더별)
 

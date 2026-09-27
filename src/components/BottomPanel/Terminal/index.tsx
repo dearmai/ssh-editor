@@ -13,6 +13,7 @@ import { getTheme } from '../../../themes';
 import { decodeOsc52Base64, readClipboard, writeClipboard } from '../../../utils/clipboard';
 import { TerminalViewport } from '../../../utils/terminalViewport';
 import { createTerminalLinkOpener } from '../../../utils/terminalLinks';
+import { handleTerminalMultilineKey } from '../../../utils/terminalKeyboard';
 import { toastError } from '../../../stores/toastStore';
 import styles from './Terminal.module.css';
 
@@ -213,6 +214,7 @@ export default function TerminalPane({ sessionId, connectionId: _connectionId, v
     // 복사/붙여넣기 — xterm은 자체 선택 모델을 쓰므로 브라우저 기본 복사가 동작하지 않는다.
     // macOS Cmd+C/V, 그 외 Ctrl+Shift+C/V를 직접 처리하고 셸로는 흘려보내지 않는다.
     term.attachCustomKeyEventHandler((e) => {
+      if (!handleTerminalMultilineKey(e, (data) => term.input(data))) return false;
       if (e.type !== 'keydown') return true;
       const key = e.key.toLowerCase();
       const mod = e.metaKey || (e.ctrlKey && e.shiftKey);
