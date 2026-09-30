@@ -15,6 +15,7 @@ import { createTerminalClipboard } from '../../../utils/terminalClipboard';
 import { TerminalViewport } from '../../../utils/terminalViewport';
 import { createTerminalLinkOpener } from '../../../utils/terminalLinks';
 import { handleTerminalMultilineKey } from '../../../utils/terminalKeyboard';
+import { createTerminalImeFallback, needsTerminalImeFallback } from '../../../utils/terminalIme';
 import { toastError } from '../../../stores/toastStore';
 import styles from './Terminal.module.css';
 
@@ -121,6 +122,27 @@ export default function TerminalPane({ sessionId, connectionId, visible = true }
     term.loadAddon(webLinksAddon);
     term.open(containerRef.current);
 
+    // Linux/Chromium의 표준 composition 경로는 xterm에 그대로 맡긴다.
+    const imePreview = document.createElement('div');
+    imePreview.className = styles.imePreview;
+    imePreview.hidden = true;
+    term.textarea?.parentElement?.appendChild(imePreview);
+    const renderImePreview = (text: string) => {
+      imePreview.textContent = text;
+      imePreview.hidden = !text;
+      if (term.textarea) {
+        imePreview.style.left = term.textarea.style.left;
+        imePreview.style.top = term.textarea.style.top;
+        imePreview.style.lineHeight = term.textarea.style.lineHeight;
+        imePreview.style.fontFamily = term.options.fontFamily ?? '';
+        imePreview.style.fontSize = `${term.options.fontSize}px`;
+      }
+    };
+    const ime = term.textarea && needsTerminalImeFallback(navigator.platform, navigator.userAgent)
+      ? createTerminalImeFallback(container, term.textarea, (data) => term.input(data), renderImePreview)
+      : undefined;
+    const imeRender = term.onRender(() => renderImePreview(imePreview.textContent ?? ''));
+
     termRef.current = term;
     const viewport = new TerminalViewport(term);
     viewportRef.current = viewport;
@@ -131,6 +153,7 @@ export default function TerminalPane({ sessionId, connectionId, visible = true }
       isAlive: () => !disposed,
       setUploading: setUploadingImage,
       paste: (text) => {
+        ime?.flush();
         term.paste(text);
         if (visibleRef.current) term.focus();
       },
@@ -235,6 +258,7 @@ export default function TerminalPane({ sessionId, connectionId, visible = true }
     // 복사/붙여넣기 — xterm은 자체 선택 모델을 쓰므로 브라우저 기본 복사가 동작하지 않는다.
     // macOS Cmd+C/V, 그 외 Ctrl+Shift+C/V를 직접 처리하고 셸로는 흘려보내지 않는다.
     term.attachCustomKeyEventHandler((e) => {
+      if (ime && !ime.handleKey(e)) return false;
       if (!handleTerminalMultilineKey(e, (data) => term.input(data))) return false;
       if (e.type !== 'keydown') return true;
       const key = e.key.toLowerCase();
@@ -273,6 +297,9 @@ export default function TerminalPane({ sessionId, connectionId, visible = true }
       termRef.current = null;
       viewportRef.current = null;
       measureRef.current = null;
+      ime?.dispose();
+      imeRender.dispose();
+      imePreview.remove();
       term.dispose();
     };
   }, [sessionId, connectionId]);
