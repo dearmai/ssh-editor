@@ -69,6 +69,8 @@ export interface EditorTab {
   /** 큰 텍스트 파일은 서버에서 일부씩 읽는 보기 탭 */
   viewMode?: boolean;
   isDirty: boolean;
+  /** 편집하거나 명시적으로 유지하기 전에는 다른 파일을 열 때 교체되는 임시 탭 */
+  isPreview?: boolean;
   language: string;
   /** 마지막으로 읽거나 저장한 시점의 원격 파일 mtime/size (외부 변경 감지용) */
   baseMtime?: number;

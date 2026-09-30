@@ -75,6 +75,10 @@
   text-overflow: ellipsis;
 }
 
+.preview {
+  font-style: italic;
+}
+
 /* 동일 파일명 구분용 상위 경로 (흐리게) */
 .dirHint {
   flex: 0 1 auto;

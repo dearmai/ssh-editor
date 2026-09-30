@@ -70,6 +70,7 @@ interface EditorStore {
   setActiveTab: (groupId: string, tabId: string) => void;
   setActiveGroup: (groupId: string) => void;
   updateContent: (tabId: string, content: string) => void;
+  keepTab: (tabId: string) => void;
   /** 탭의 구문 강조 언어를 수동 변경 (상태바 언어 선택) */
   setTabLanguage: (tabId: string, language: string) => void;
   /** 탭의 자동 줄바꿈 on/off 토글 (Alt+Z / 상태바 버튼) */
@@ -297,8 +298,15 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   updateContent: (tabId, content) =>
     set((s) => {
       const tab = s.tabsById[tabId];
-      if (!tab) return {};
-      return { tabsById: { ...s.tabsById, [tabId]: { ...tab, content, isDirty: true } } };
+      if (!tab || tab.content === content) return {};
+      return { tabsById: { ...s.tabsById, [tabId]: { ...tab, content, isDirty: true, isPreview: false } } };
+    }),
+
+  keepTab: (tabId) =>
+    set((s) => {
+      const tab = s.tabsById[tabId];
+      if (!tab?.isPreview) return {};
+      return { tabsById: { ...s.tabsById, [tabId]: { ...tab, isPreview: false } } };
     }),
 
   setTabLanguage: (tabId, language) =>
@@ -504,6 +512,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   },
 
   splitActive: (direction) => {
+    const activeTabId = get().groupsById[get().activeGroupId]?.activeTabId;
+    if (activeTabId) get().keepTab(activeTabId);
     set((s) => {
       const g = s.groupsById[s.activeGroupId];
       if (!g || !g.activeTabId) return {};
@@ -521,6 +531,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   setDraggingTab: (info) => set({ draggingTab: info }),
 
   moveTab: (tabId, fromGroupId, toGroupId, toIndex) => {
+    get().keepTab(tabId);
     set((s) => {
       const groupsById = { ...s.groupsById };
 
@@ -570,6 +581,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   },
 
   dropSplit: (tabId, fromGroupId, targetGroupId, side) => {
+    get().keepTab(tabId);
     set((s) => {
       const fromGroup = s.groupsById[fromGroupId];
       if (!fromGroup) return {};
@@ -675,6 +687,31 @@ type SetFn = (
   partial: Partial<EditorStore> | ((state: EditorStore) => Partial<EditorStore>)
 ) => void;
 
+/** 읽기에 성공한 뒤 활성 그룹의 미편집 임시 탭을 교체한다. */
+function insertPreviewTab(s: EditorStore, tab: EditorTab): Partial<EditorStore> {
+  // 같은 파일을 중복으로 읽어도 기존 편집 내용을 덮어쓰지 않는다.
+  const existing = Object.values(s.groupsById).find((g) => g.tabIds.includes(tab.id));
+  if (existing) {
+    return {
+      activeGroupId: existing.id,
+      groupsById: { ...s.groupsById, [existing.id]: { ...existing, activeTabId: tab.id } },
+    };
+  }
+  const active = s.groupsById[s.activeGroupId];
+  const previewIndex = active.tabIds.findIndex((id) => s.tabsById[id]?.isPreview && !s.tabsById[id]?.isDirty);
+  const tabIds = [...active.tabIds];
+  if (previewIndex < 0) tabIds.push(tab.id);
+  else tabIds[previewIndex] = tab.id;
+  const groupsById = {
+    ...s.groupsById,
+    [active.id]: { ...active, tabIds, activeTabId: tab.id },
+  };
+  return {
+    groupsById,
+    tabsById: pruneTabs({ ...s.tabsById, [tab.id]: { ...tab, isPreview: true } }, groupsById),
+  };
+}
+
 /** 실제 파일을 읽어 활성 그룹에 탭으로 연다 */
 async function performOpen(set: SetFn, connectionId: string, entry: FileEntry) {
   const tabId = makeTabId(connectionId, entry.path);
@@ -694,20 +731,7 @@ async function performOpen(set: SetFn, connectionId: string, entry: FileEntry) {
       baseMtime: stat?.mtime,
       baseSize: stat?.size,
     };
-    set((s) => {
-      const active = s.groupsById[s.activeGroupId];
-      return {
-        tabsById: { ...s.tabsById, [tabId]: tab },
-        groupsById: {
-          ...s.groupsById,
-          [s.activeGroupId]: {
-            ...active,
-            tabIds: [...active.tabIds, tabId],
-            activeTabId: tabId,
-          },
-        },
-      };
-    });
+    set((s) => insertPreviewTab(s, tab));
     log.info(`파일 열기: ${entry.path}`);
   } catch (e) {
     log.error(`파일 열기 실패: ${entry.path} — ${e}`);
@@ -721,14 +745,5 @@ function openViewerTab(set: SetFn, connectionId: string, entry: FileEntry) {
     id: tabId, connectionId, remotePath: entry.path, fileName: entry.name,
     content: '', isDirty: false, language: 'plaintext', viewMode: true,
   };
-  set((s) => {
-    const active = s.groupsById[s.activeGroupId];
-    return {
-      tabsById: { ...s.tabsById, [tabId]: tab },
-      groupsById: {
-        ...s.groupsById,
-        [s.activeGroupId]: { ...active, tabIds: [...active.tabIds, tabId], activeTabId: tabId },
-      },
-    };
-  });
+  set((s) => insertPreviewTab(s, tab));
 }

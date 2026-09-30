@@ -24,6 +24,7 @@ export default function EditorTabs({ group, groupCount }: { group: EditorGroup; 
   const closeOtherTabs = useEditorStore((s) => s.closeOtherTabs);
   const closeTabsInGroup = useEditorStore((s) => s.closeTabsInGroup);
   const saveTab = useEditorStore((s) => s.saveTab);
+  const keepTab = useEditorStore((s) => s.keepTab);
   const moveTab = useEditorStore((s) => s.moveTab);
   const splitActive = useEditorStore((s) => s.splitActive);
   const togglePreview = useEditorStore((s) => s.togglePreview);
@@ -147,10 +148,11 @@ export default function EditorTabs({ group, groupCount }: { group: EditorGroup; 
                   }}
                   onDrop={performDrop}
                   onClick={() => setActiveTab(group.id, id)}
-                  title={tab.remotePath}
+                  onDoubleClick={() => keepTab(id)}
+                  title={`${tab.remotePath}${tab.isPreview ? '\n임시 탭 · 더블클릭하여 유지' : ''}`}
                 >
                   {tab.isDirty && <span className={styles.dirty} title="저장되지 않은 변경사항" />}
-                  <span className={styles.name}>{tab.fileName}</span>
+                  <span className={`${styles.name} ${tab.isPreview ? styles.preview : ''}`}>{tab.fileName}</span>
                   {labels[id]?.hint && (
                     <span className={styles.dirHint} title={tab.remotePath}>
                       {labels[id].hint}
