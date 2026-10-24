@@ -33,6 +33,14 @@ VSCode 스타일의 **SSH 원격 파일 에디터**. Tauri v2 + React + Monaco E
 
 ## 사전 준비
 
+Windows 무설치판: `npm run tauri:portable`. 결과는
+`build/windows-portable/ssh-editor.exe`입니다. 실행파일 옆 `data/`에 서버 목록과
+UI 설정·웹뷰 데이터를 저장합니다. [사용 안내](docs/windows-build.md#포터블-무설치-빌드).
+
+폐쇄망용 NSIS: `npm run tauri:build -- --config src-tauri/tauri.offline.conf.json --bundles nsis`.
+WebView2 오프라인 설치 프로그램을 포함하며, 릴리스 빌드에는 Monaco 편집기도 내장합니다.
+포터블 실행파일 옆 `WebView2/`에 Microsoft 고정 런타임을 배치하면 해당 런타임을 사용합니다.
+
 - macOS (Apple Silicon/Intel) 또는 Linux
 - [Node.js](https://nodejs.org/) 22+ (현재 검증 환경: 24)
 - [Rust](https://rustup.rs/) (stable)

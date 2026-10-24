@@ -48,6 +48,7 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
+portable = []
 
 [target.'cfg(target_os = "linux")'.dependencies]
 webkit2gtk = { version = "2", features = ["v2_20"] }

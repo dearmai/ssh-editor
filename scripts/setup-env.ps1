@@ -27,7 +27,11 @@ Write-Host "==== SSH Editor - Windows 빌드 환경 세팅 ====" -ForegroundColo
 Write-Host ""
 
 # 1) VS Build Tools (MSVC 링커 + Windows SDK) — VCTools 워크로드 포함
-if (-not (Get-Command link.exe -ErrorAction SilentlyContinue)) {
+$vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+$vc = if (Test-Path $vswhere) {
+    & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+}
+if (-not $vc) {
     Write-Host "  [INSTALL] VS 2022 Build Tools (VCTools 워크로드)..." -ForegroundColor Cyan
     winget install --id Microsoft.VisualStudio.2022.BuildTools -e `
         --accept-source-agreements --accept-package-agreements `

@@ -46,7 +46,7 @@ if (Get-Command cmake -ErrorAction SilentlyContinue) {
 }
 
 # 4) MSVC 링커 (link.exe) - VS Build Tools
-$link = Get-Command 'link.exe' -ErrorAction SilentlyContinue
+$link = Get-Command 'link.exe' -ErrorAction SilentlyContinue | Where-Object { $_.Source -match 'Microsoft Visual Studio' }
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 if ($link) {
     Write-Host ("  [OK]   {0,-18} {1}" -f 'MSVC 링커', 'link.exe (개발자 셸)') -ForegroundColor Green

@@ -4,6 +4,7 @@ mod error;
 mod local_files;
 use local_files::*;
 mod ssh;
+mod storage;
 #[cfg(target_os = "linux")]
 mod webview_recovery;
 
@@ -53,6 +54,7 @@ fn start_exit_flow(app: &tauri::AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run(startup_args: Option<StartupArgs>) {
+    storage::initialize().expect("설정 디렉터리를 준비할 수 없습니다. 실행파일 폴더의 쓰기 권한을 확인하세요.");
     let builder = tauri::Builder::default();
     #[cfg(target_os = "linux")]
     let builder = builder.plugin(webview_recovery::plugin());

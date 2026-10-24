@@ -108,7 +108,7 @@ pub async fn load_ssh_config() -> AppResult<Vec<SshConfigHost>> {
 #[tauri::command]
 pub async fn load_profiles(app: tauri::AppHandle) -> AppResult<Vec<ConnectionProfile>> {
     let store = app
-        .store("ssh-editor.json")
+        .store(crate::storage::profiles_path()?)
         .map_err(|e| AppError::Other(format!("Store 오류: {}", e)))?;
     let profiles = store
         .get("connections")
@@ -123,7 +123,7 @@ pub async fn save_profile(
     app: tauri::AppHandle,
 ) -> AppResult<()> {
     let store = app
-        .store("ssh-editor.json")
+        .store(crate::storage::profiles_path()?)
         .map_err(|e| AppError::Other(format!("Store 오류: {}", e)))?;
     let mut profiles: Vec<ConnectionProfile> = store
         .get("connections")
@@ -147,7 +147,7 @@ pub async fn save_profile(
 #[tauri::command]
 pub async fn delete_profile(id: String, app: tauri::AppHandle) -> AppResult<()> {
     let store = app
-        .store("ssh-editor.json")
+        .store(crate::storage::profiles_path()?)
         .map_err(|e| AppError::Other(format!("Store 오류: {}", e)))?;
     let mut profiles: Vec<ConnectionProfile> = store
         .get("connections")
