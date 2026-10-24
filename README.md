@@ -10,6 +10,7 @@ VSCode 스타일의 **SSH 원격 파일 에디터**. Tauri v2 + React + Monaco E
 - **통합 터미널** — xterm.js 기반 멀티 세션 PTY 터미널 (VSCode처럼 탭으로 여러 개)
 - **로그 패널** — 프로그램 동작 로그를 레벨 필터(Info/Warn/Error)와 함께 출력
 - **서버 관리** — 자체 서버 목록 관리, `~/.ssh/config`에서 가져오기, SSH Agent/키 파일/비밀번호 인증
+- **점프 호스트 · 프록시** — ProxyJump 체인(홉별 인증), HTTP/HTTPS(CONNECT)·SOCKS5 프록시(선택 인증). `~/.ssh/config`의 `ProxyJump`도 가져옴
 - **복수 시작 디렉토리** — 서버별로 여러 base 디렉토리를 등록하고 빠르게 전환
 - **테마** — Dark / Light / System, **서버·폴더별 오버라이드** 지원 (상태바에서 즉시 전환)
 - **폰트 설정** — 기본(sans-serif) / 에디터·터미널(monospace) 폰트 패밀리·크기
@@ -167,7 +168,7 @@ ssh-editor/
 │   ├── ipc/                      # invoke/listen 래퍼
 │   └── types/
 ├── src-tauri/src/                # Rust 백엔드
-│   ├── ssh/                      # connection(연결풀·ping), sftp, terminal
+│   ├── ssh/                      # connection(연결풀·ping·점프), proxy, sftp, terminal
 │   ├── commands/                 # #[tauri::command] 핸들러
 │   ├── config/                   # ConnectionProfile, ~/.ssh/config 파싱
 │   └── lib.rs                    # 앱 빌더, 메뉴바, 커맨드 등록

@@ -1,4 +1,5 @@
 pub mod connection;
+pub mod proxy;
 pub mod sftp;
 pub mod terminal;
 pub mod transfer;

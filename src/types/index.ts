@@ -1,15 +1,42 @@
+export type AuthType = 'password' | 'publicKey' | 'agent';
+
+export interface JumpHost {
+  hostname: string;
+  port: number;
+  username: string;
+  authType: AuthType;
+  password?: string;
+  identityFile?: string;
+}
+
+export type ProxyType = 'http' | 'https' | 'socks5';
+
+export interface ProxyConfig {
+  type: ProxyType;
+  host: string;
+  port: number;
+  username?: string;
+  password?: string;
+  /** HTTPS 프록시 인증서 검증 생략 */
+  insecure?: boolean;
+}
+
 export interface ConnectionProfile {
   id: string;
   name: string;
   hostname: string;
   port: number;
   username: string;
-  authType: 'password' | 'publicKey' | 'agent';
+  authType: AuthType;
   password?: string;
   identityFile?: string;
   lastPath?: string;
   /** 즐겨찾기/시작 디렉토리 목록 (첫 번째가 기본 시작 디렉토리) */
   directories?: string[];
+  /** 점프 호스트 체인 (앞에서부터 순서대로 경유) */
+  jumpHosts?: JumpHost[];
+  /** 첫 번째 홉 접속에 사용할 프록시 */
+  proxy?: ProxyConfig | null;
 }
 
 export interface PingInfo {

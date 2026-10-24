@@ -3,8 +3,44 @@ import { ChevronDown, Download, Plus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useConnectionStore } from '../../stores/connectionStore';
 import { useFileTreeStore } from '../../stores/fileTreeStore';
-import type { ConnectionProfile, SshConfigHost } from '../../types';
+import type { AuthType, ConnectionProfile, ProxyType, SshConfigHost } from '../../types';
+import { parseProxyJump } from '../../utils/proxyJump';
 import styles from './Dialog.module.css';
+
+interface JumpForm {
+  hostname: string;
+  port: string;
+  username: string;
+  authType: AuthType;
+  password: string;
+  identityFile: string;
+}
+
+interface ProxyForm {
+  type: 'none' | ProxyType;
+  host: string;
+  port: string;
+  username: string;
+  password: string;
+  insecure: boolean;
+}
+
+const EMPTY_PROXY: ProxyForm = {
+  type: 'none', host: '', port: '', username: '', password: '', insecure: false,
+};
+
+const DEFAULT_PROXY_PORT: Record<ProxyType, number> = { http: 8080, https: 443, socks5: 1080 };
+
+const PROXY_TYPES: { value: ProxyForm['type']; label: string }[] = [
+  { value: 'none', label: '없음' },
+  { value: 'http', label: 'HTTP' },
+  { value: 'https', label: 'HTTPS' },
+  { value: 'socks5', label: 'SOCKS5' },
+];
+
+const emptyJump = (): JumpForm => ({
+  hostname: '', port: '22', username: '', authType: 'agent', password: '', identityFile: '',
+});
 
 interface Props {
   open: boolean;
@@ -32,6 +68,9 @@ export default function NewConnectionDialog({ open, onClose, editProfile }: Prop
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [jumps, setJumps] = useState<JumpForm[]>([]);
+  const [proxy, setProxy] = useState<ProxyForm>(EMPTY_PROXY);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   useEffect(() => {
     if (open && sshConfigHosts.length === 0) {
@@ -56,12 +95,39 @@ export default function NewConnectionDialog({ open, onClose, editProfile }: Prop
         saveProfile: true,
       });
       setDirectories(editProfile.directories ?? []);
+      setJumps(
+        (editProfile.jumpHosts ?? []).map((j) => ({
+          hostname: j.hostname,
+          port: String(j.port ?? 22),
+          username: j.username ?? '',
+          authType: j.authType,
+          password: j.password ?? '',
+          identityFile: j.identityFile ?? '',
+        })),
+      );
+      const p = editProfile.proxy;
+      setProxy(
+        p
+          ? {
+              type: p.type,
+              host: p.host,
+              port: String(p.port),
+              username: p.username ?? '',
+              password: p.password ?? '',
+              insecure: !!p.insecure,
+            }
+          : EMPTY_PROXY,
+      );
+      setShowAdvanced(!!p || (editProfile.jumpHosts?.length ?? 0) > 0);
     } else {
       setForm({
         name: '', hostname: '', port: '22', username: '',
         authType: 'agent', password: '', identityFile: '', saveProfile: true,
       });
       setDirectories([]);
+      setJumps([]);
+      setProxy(EMPTY_PROXY);
+      setShowAdvanced(false);
     }
   }, [open, editProfile]);
 
@@ -75,6 +141,18 @@ export default function NewConnectionDialog({ open, onClose, editProfile }: Prop
       authType: host.identityFile ? 'publicKey' : 'agent',
       identityFile: host.identityFile ?? prev.identityFile,
     }));
+    const jumpHosts = parseProxyJump(host.proxyJump, sshConfigHosts);
+    setJumps(
+      jumpHosts.map((j) => ({
+        hostname: j.hostname,
+        port: String(j.port),
+        username: j.username,
+        authType: j.authType,
+        password: '',
+        identityFile: j.identityFile ?? '',
+      })),
+    );
+    if (jumpHosts.length > 0) setShowAdvanced(true);
     setShowImport(false);
   };
 
@@ -85,8 +163,35 @@ export default function NewConnectionDialog({ open, onClose, editProfile }: Prop
       return;
     }
 
+    if (proxy.type !== 'none' && !proxy.host.trim()) {
+      setError('프록시 호스트를 입력하세요.');
+      return;
+    }
+
     setLoading(true);
     setError('');
+
+    const jumpHosts = jumps
+      .filter((j) => j.hostname.trim())
+      .map((j) => ({
+        hostname: j.hostname.trim(),
+        port: parseInt(j.port) || 22,
+        username: j.username.trim(),
+        authType: j.authType,
+        password: j.authType === 'password' ? j.password : undefined,
+        identityFile: j.authType === 'publicKey' ? j.identityFile.trim() : undefined,
+      }));
+    const proxyConfig =
+      proxy.type === 'none'
+        ? null
+        : {
+            type: proxy.type,
+            host: proxy.host.trim(),
+            port: parseInt(proxy.port) || DEFAULT_PROXY_PORT[proxy.type],
+            username: proxy.username.trim() || undefined,
+            password: proxy.username.trim() ? proxy.password : undefined,
+            insecure: proxy.type === 'https' ? proxy.insecure : undefined,
+          };
 
     const dirs = directories.map((d) => d.trim()).filter(Boolean);
     const profile: ConnectionProfile = {
@@ -100,6 +205,8 @@ export default function NewConnectionDialog({ open, onClose, editProfile }: Prop
       identityFile: form.authType === 'publicKey' ? form.identityFile.trim() : undefined,
       lastPath: editProfile?.lastPath,
       directories: dirs,
+      jumpHosts,
+      proxy: proxyConfig,
     };
 
     try {
@@ -126,6 +233,9 @@ export default function NewConnectionDialog({ open, onClose, editProfile }: Prop
 
   const set = (field: keyof typeof form, value: string | boolean) =>
     setForm((prev) => ({ ...prev, [field]: value }));
+  const setJump = (i: number, patch: Partial<JumpForm>) =>
+    setJumps((arr) => arr.map((j, k) => (k === i ? { ...j, ...patch } : j)));
+  const setProxyField = (patch: Partial<ProxyForm>) => setProxy((prev) => ({ ...prev, ...patch }));
 
   return (
     <Dialog.Root open={open} onOpenChange={(o) => !o && onClose()}>
@@ -272,6 +382,176 @@ export default function NewConnectionDialog({ open, onClose, editProfile }: Prop
                   onChange={(e) => set('identityFile', e.target.value)}
                   placeholder="~/.ssh/id_ed25519"
                 />
+              </div>
+            )}
+
+            {/* 점프 호스트 · 프록시 */}
+            <button
+              type="button"
+              className={styles.importToggle}
+              onClick={() => setShowAdvanced((v) => !v)}
+            >
+              점프 호스트 · 프록시
+              {(jumps.length > 0 || proxy.type !== 'none') && (
+                <span className={styles.importMeta}>
+                  {[
+                    jumps.length > 0 ? `점프 ${jumps.length}` : '',
+                    proxy.type !== 'none' ? proxy.type.toUpperCase() : '',
+                  ].filter(Boolean).join(' · ')}
+                </span>
+              )}
+              <ChevronDown
+                size={13}
+                style={{ transform: showAdvanced ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}
+              />
+            </button>
+
+            {showAdvanced && (
+              <div className={styles.advanced}>
+                <div className={styles.field}>
+                  <label className={styles.label}>점프 호스트 (ProxyJump · 위에서부터 순서대로 경유)</label>
+                  {jumps.map((j, i) => (
+                    <div key={i} className={styles.jumpCard}>
+                      <div className={styles.row} style={{ gap: 6 }}>
+                        <input
+                          value={j.username}
+                          onChange={(e) => setJump(i, { username: e.target.value })}
+                          placeholder="사용자"
+                          style={{ width: 90 }}
+                        />
+                        <input
+                          value={j.hostname}
+                          onChange={(e) => setJump(i, { hostname: e.target.value })}
+                          placeholder="bastion.example.com"
+                          style={{ flex: 1, minWidth: 0 }}
+                        />
+                        <input
+                          type="number"
+                          value={j.port}
+                          onChange={(e) => setJump(i, { port: e.target.value })}
+                          min={1}
+                          max={65535}
+                          style={{ width: 64 }}
+                        />
+                        <button
+                          type="button"
+                          className={styles.iconRemoveBtn}
+                          onClick={() => setJumps((arr) => arr.filter((_, k) => k !== i))}
+                          title="제거"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                      <div className={styles.row} style={{ gap: 6 }}>
+                        <select
+                          className={styles.select}
+                          value={j.authType}
+                          onChange={(e) => setJump(i, { authType: e.target.value as AuthType })}
+                        >
+                          <option value="agent">SSH 키 (기본)</option>
+                          <option value="publicKey">키 파일 지정</option>
+                          <option value="password">비밀번호</option>
+                        </select>
+                        {j.authType === 'password' && (
+                          <input
+                            type="password"
+                            value={j.password}
+                            onChange={(e) => setJump(i, { password: e.target.value })}
+                            placeholder="비밀번호"
+                            style={{ flex: 1, minWidth: 0 }}
+                          />
+                        )}
+                        {j.authType === 'publicKey' && (
+                          <input
+                            value={j.identityFile}
+                            onChange={(e) => setJump(i, { identityFile: e.target.value })}
+                            placeholder="~/.ssh/id_ed25519"
+                            style={{ flex: 1, minWidth: 0 }}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    className={styles.addDirBtn}
+                    onClick={() => setJumps((arr) => [...arr, emptyJump()])}
+                  >
+                    <Plus size={13} />
+                    점프 호스트 추가
+                  </button>
+                </div>
+
+                <div className={styles.field}>
+                  <label className={styles.label}>프록시 (첫 번째 접속 구간에 적용)</label>
+                  <div className={styles.segGroup}>
+                    {PROXY_TYPES.map((t) => (
+                      <button
+                        key={t.value}
+                        type="button"
+                        className={`${styles.segBtn} ${proxy.type === t.value ? styles.segActive : ''}`}
+                        onClick={() => setProxyField({ type: t.value })}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {proxy.type !== 'none' && (
+                  <>
+                    <div className={styles.row}>
+                      <div className={styles.field} style={{ flex: 1 }}>
+                        <label className={styles.label}>프록시 호스트 *</label>
+                        <input
+                          value={proxy.host}
+                          onChange={(e) => setProxyField({ host: e.target.value })}
+                          placeholder="proxy.example.com"
+                        />
+                      </div>
+                      <div className={styles.field} style={{ width: 80 }}>
+                        <label className={styles.label}>포트</label>
+                        <input
+                          type="number"
+                          value={proxy.port}
+                          onChange={(e) => setProxyField({ port: e.target.value })}
+                          placeholder={String(DEFAULT_PROXY_PORT[proxy.type])}
+                          min={1}
+                          max={65535}
+                        />
+                      </div>
+                    </div>
+                    <div className={styles.row}>
+                      <div className={styles.field} style={{ flex: 1 }}>
+                        <label className={styles.label}>프록시 사용자 (선택)</label>
+                        <input
+                          value={proxy.username}
+                          onChange={(e) => setProxyField({ username: e.target.value })}
+                          autoComplete="off"
+                        />
+                      </div>
+                      <div className={styles.field} style={{ flex: 1 }}>
+                        <label className={styles.label}>프록시 비밀번호</label>
+                        <input
+                          type="password"
+                          value={proxy.password}
+                          onChange={(e) => setProxyField({ password: e.target.value })}
+                          autoComplete="off"
+                        />
+                      </div>
+                    </div>
+                    {proxy.type === 'https' && (
+                      <label className={styles.checkLabel}>
+                        <input
+                          type="checkbox"
+                          checked={proxy.insecure}
+                          onChange={(e) => setProxyField({ insecure: e.target.checked })}
+                        />
+                        프록시 인증서 검증 생략 (자체 서명 인증서)
+                      </label>
+                    )}
+                  </>
+                )}
               </div>
             )}
 

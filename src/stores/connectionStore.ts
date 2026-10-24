@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { message } from '@tauri-apps/plugin-dialog';
 import { confirmUnsavedChanges } from '../utils/confirmUnsavedChanges';
+import { parseProxyJump } from '../utils/proxyJump';
 import {
   deleteProfile,
   getActiveConnections,
@@ -141,6 +142,7 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => ({
       username: host.user ?? '',
       authType: host.identityFile ? 'publicKey' : 'agent',
       identityFile: host.identityFile,
+      jumpHosts: parseProxyJump(host.proxyJump, get().sshConfigHosts),
     };
     return get().connect(profile);
   },

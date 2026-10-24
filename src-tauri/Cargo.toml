@@ -37,6 +37,7 @@ thiserror    = { version = "2" }
 dashmap      = { version = "6" }
 dirs         = { version = "6" }
 base64       = { version = "0.22" }
+tokio-native-tls = { version = "0.3" }
 log          = { version = "0.4" }
 async-trait  = { version = "0.1" }
 regex        = { version = "1" }
