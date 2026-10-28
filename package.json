@@ -12,6 +12,7 @@
     "tauri:dev": "tauri dev -- --features custom-protocol",
     "tauri:build": "tauri build",
     "tauri:portable": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-portable.ps1",
+    "tauri:signed": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-signed.ps1",
     "native": "bash scripts/native.sh debug --run",
     "native:debug": "bash scripts/native.sh debug",
     "native:release": "bash scripts/native.sh release",

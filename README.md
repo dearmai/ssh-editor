@@ -42,6 +42,11 @@ UI 설정·웹뷰 데이터를 저장합니다. [사용 안내](docs/windows-bui
 WebView2 오프라인 설치 프로그램을 포함하며, 릴리스 빌드에는 Monaco 편집기도 내장합니다.
 포터블 실행파일 옆 `WebView2/`에 Microsoft 고정 런타임을 배치하면 해당 런타임을 사용합니다.
 
+셀프 인증서 서명 빌드(설치판 + 포터블): `npm run tauri:signed` (또는 `make signed`).
+설치판·포터블·`install-cert.cmd`·공개 인증서가 `build/windows-signed/`에 함께 모이며,
+대상 PC에서는 그 폴더의 `install-cert.cmd`로 공개 인증서를 등록합니다.
+인증서·개인 키 관리와 서명 절차: [docs/codesign.md](docs/codesign.md).
+
 - macOS (Apple Silicon/Intel) 또는 Linux
 - [Node.js](https://nodejs.org/) 22+ (현재 검증 환경: 24)
 - [Rust](https://rustup.rs/) (stable)

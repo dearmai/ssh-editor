@@ -38,3 +38,8 @@ pnpm-debug.log*
 # 디렉토리 자체를 제외하면 하위 파일 예외가 먹지 않으므로 docs/* 로 제외한다
 docs/*
 !docs/windows-build.md
+!docs/codesign.md
+
+# ── 코드 서명 개인 키 (docs/codesign.md) ───────
+*.pfx
+*.p12

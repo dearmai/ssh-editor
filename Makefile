@@ -12,6 +12,7 @@
 #                        mac: .app 빌드 후 /Applications 에 설치
 #    make dev          개발 모드 실행
 #    make build        배포 빌드 (설치파일/번들만 생성)
+#    make signed       코드사인 배포 빌드 (Windows 전용, 설치판+포터블)
 #    make setup        make install 별칭 (하위호환)
 #    make verify       타입 검증 (tsc + cargo check)
 #    make clean        빌드 산출물 정리
@@ -37,7 +38,7 @@ else
 endif
 
 .DEFAULT_GOAL := help
-.PHONY: help env-check env-setup setup install deps dev build native verify frontend rust clean
+.PHONY: help env-check env-setup setup install deps dev build signed native verify frontend rust clean
 
 # ============================================================================
 #  Windows
@@ -67,6 +68,10 @@ dev:
 
 build:
 	npm run tauri:build
+
+# 셀프 인증서로 서명한 설치판(NSIS)+포터블 빌드 (처음 한 번 scripts/codesign-cert.ps1 필요)
+signed:
+	npm run tauri:signed
 
 native: build
 
@@ -115,6 +120,9 @@ verify:
 		cd src-tauri && cargo check --locked; \
 	fi
 
+signed:
+	@echo "make signed 는 Windows 전용입니다." && exit 1
+
 clean:
 	rm -rf build src-tauri/target dist
 
@@ -133,6 +141,7 @@ help:
 	@echo "  make install     빌드 후 설치 (mac: /Applications, Linux: ~/.local)"
 	@echo "  make dev         개발 모드 실행"
 	@echo "  make build       배포 빌드 (설치파일/번들 생성)"
+	@echo "  make signed      코드사인 배포 빌드 (Windows 전용)"
 	@echo "  make setup       make install 별칭 (하위호환)"
 	@echo "  make verify      타입 검증 (tsc + cargo check)"
 	@echo "  make clean       빌드 산출물 정리"

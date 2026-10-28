@@ -139,6 +139,27 @@ SSH 키와 사용자가 가져오는 `~/.ssh/config`는 자동 복사하지 않�
 실기 검증: 서버 프로필·테마·폰트·들여쓰기를 변경하고 종료한 뒤 폴더를 다른
 경로로 옮겨 재실행하여 설정 유지 및 새 창 동작을 확인하세요.
 
+### 코드 서명 (셀프 인증서, 사내·폐쇄망 배포용)
+
+개인 키 생성·백업·복원·갱신·유출 대응과 문제 해결은 [codesign.md](codesign.md)를 참고하세요.
+
+1. 처음 한 번 `powershell -ExecutionPolicy Bypass -File scripts\codesign-cert.ps1`을 실행합니다.
+   코드 서명 인증서(`CN=Dany Kim, O=SSH Editor`)를 현재 사용자 인증서 저장소에 만들고,
+   공개 인증서를 `codesign\SSH-Editor-codesign.cer`로 내보냅니다.
+   `-BackupPfx <경로>`를 주면 개인 키를 비밀번호 걸린 `.pfx`로 백업합니다(저장소에 넣지 말 것).
+2. `npm run tauri:signed`로 빌드합니다. 폐쇄망용 NSIS 설치판(앱 exe·언인스톨러·설치 파일)과
+   포터블 exe를 SHA-256으로 서명하고 DigiCert RFC 3161 타임스탬프를 넣습니다.
+   인증서가 만료돼도 서명은 유효합니다. 하나만 빌드하려면
+   `scripts\build-signed.ps1 -Installer` 또는 `-Portable`.
+   설치판·포터블·`install-cert.cmd`·`.cer`가 모두 `build\windows-signed\`에 모입니다.
+3. 배포 대상 PC에서 배포본 폴더의 `install-cert.cmd`를 실행하거나 GPO로 `.cer`를 배포합니다.
+   신뢰할 수 있는 루트 인증 기관과 신뢰할 수 있는 게시자에 등록되어 '확인된 게시자: Dany Kim'으로
+   보이고, 게시자 기준 실행 정책(AppLocker·WDAC)에도 쓸 수 있습니다.
+
+- 개인 키와 비밀번호는 설정 파일이나 저장소에 두지 않습니다. 서명할 때 인증서 저장소에서 주체 이름으로 찾습니다.
+- 서명에는 Windows SDK의 `signtool.exe`가 필요하고, 타임스탬프 때문에 빌드 PC에 인터넷이 필요합니다.
+- 셀프 인증서라 SmartScreen 평판은 생기지 않습니다.
+
 ```powershell
 make install     # = make setup (별칭)
 # 또는
