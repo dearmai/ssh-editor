@@ -20,6 +20,7 @@ import TerminalPanel from './components/TerminalPanel';
 import SettingsDialog from './components/Dialogs/SettingsDialog';
 import SaveConflictDialog from './components/Dialogs/SaveConflictDialog';
 import OpenFileDialog from './components/Dialogs/OpenFileDialog';
+import PathOpenDialog, { type PathOpenTarget } from './components/Dialogs/PathOpenDialog';
 import ConfirmDialog from './components/Dialogs/ConfirmDialog';
 import Toasts from './components/Toasts';
 import PromptDialog from './components/Dialogs/PromptDialog';
@@ -29,7 +30,8 @@ import ThemePicker from './components/ThemePicker';
 import LanguageStatus from './components/LanguageStatus';
 import IndentStatus from './components/IndentStatus';
 import { exitVote, takeOpenFiles, getStartupArgs, openNewWindow, sshPing } from './ipc/commands';
-import { onTransferProgress } from './ipc/events';
+import { onTransferProgress, onTerminalExit } from './ipc/events';
+import { useTerminalStore } from './stores/terminalStore';
 import { confirmUnsavedChanges } from './utils/confirmUnsavedChanges';
 import { useConnectionStore } from './stores/connectionStore';
 import { useEditorStore } from './stores/editorStore';
@@ -68,6 +70,40 @@ export default function App() {
   const { loadAll, selectedSessionId, activeConnections } = useConnectionStore();
   const rootPaths = useFileTreeStore((s) => s.rootPaths);
   const [showSettings, setShowSettings] = useState(false);
+  const [pathOpenTarget, setPathOpenTarget] = useState<PathOpenTarget | null>(null);
+
+  useEffect(() => {
+    const openPath = () => {
+      const local = useLocalWorkspaceStore.getState();
+      const connections = useConnectionStore.getState();
+      const connectionId = local.active ? 'local' : connections.selectedSessionId;
+      if (!connectionId) {
+        toastError('먼저 SSH 서버 또는 로컬 작업 폴더를 선택하세요.');
+        return;
+      }
+      const editor = useEditorStore.getState();
+      const activeTabId = editor.groupsById[editor.activeGroupId]?.activeTabId;
+      const tab = activeTabId ? editor.tabsById[activeTabId] : undefined;
+      let basePath = connectionId === 'local' ? local.root ?? '' : useFileTreeStore.getState().rootPaths.get(connectionId) ?? '';
+      if (tab?.connectionId === connectionId) {
+        const path = tab.remotePath.replace(/\\/g, '/');
+        basePath = path.slice(0, path.lastIndexOf('/') + 1);
+      }
+      const label = connectionId === 'local' ? '로컬' : connections.activeConnections.find((item) => item.sessionId === connectionId)?.profile.name ?? 'SSH 서버';
+      setPathOpenTarget((current) => current ?? { connectionId, basePath, label });
+    };
+    const unlisten = listen('menu-open-path', openPath);
+    const onKeyDown = (event: KeyboardEvent) => {
+      const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
+      if (!(isMac ? event.metaKey : event.ctrlKey) || event.altKey || event.shiftKey || event.key.toLowerCase() !== 'p') return;
+      if (event.isComposing || event.keyCode === 229) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (!event.repeat) openPath();
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => { unlisten.then((off) => off()); window.removeEventListener('keydown', onKeyDown, true); };
+  }, []);
 
   const uiFontFamily = useSettingsStore((s) => s.uiFontFamily);
   const uiFontSize = useSettingsStore((s) => s.uiFontSize);
@@ -145,12 +181,21 @@ export default function App() {
     log.info('SSH Editor 시작됨');
 
     const unlistenPrefs = listen('menu-preferences', () => setShowSettings(true));
+    const unlistenCopy = listen('menu-copy', () => {
+      // 활성 요소에서 버블링하므로 다른 터미널/숨긴 탭의 선택을 복사하지 않는다.
+      const event = new Event('ssh-editor-copy', { bubbles: true, cancelable: true });
+      const unhandled = document.activeElement?.dispatchEvent(event) ?? true;
+      if (unhandled) document.execCommand('copy');
+    });
     const unlistenTransfer = onTransferProgress((p) =>
       useTransferStore.getState().applyProgress(p)
     );
+    const unlistenTerminalExit = onTerminalExit((id) => useTerminalStore.getState().handleSessionExit(id));
     return () => {
       unlistenPrefs.then((fn) => fn());
+      unlistenCopy.then((fn) => fn());
       unlistenTransfer.then((fn) => fn());
+      unlistenTerminalExit.then((fn) => fn());
     };
   }, [loadAll]);
 
@@ -274,9 +319,17 @@ export default function App() {
   // Cmd/Ctrl+W: 활성 탭 닫기 → 열린 탭이 하나도 없으면 창 닫기
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'w') return;
+      const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
+      if (!(isMac ? e.metaKey : e.ctrlKey) || e.altKey || e.shiftKey || e.key.toLowerCase() !== 'w') return;
       e.preventDefault();
       e.stopPropagation();
+      if (e.repeat || document.querySelector('[role="dialog"]')) return;
+      const target = e.target instanceof Element ? e.target : document.activeElement;
+      const terminalId = target?.closest('[data-terminal-id]')?.getAttribute('data-terminal-id');
+      if (terminalId) {
+        void useTerminalStore.getState().requestCloseSession(terminalId);
+        return;
+      }
       const st = useEditorStore.getState();
       const g = st.groupsById[st.activeGroupId];
       if (g && g.activeTabId) {
@@ -433,6 +486,7 @@ export default function App() {
       <SettingsDialog open={showSettings} onClose={() => setShowSettings(false)} />
       <SaveConflictDialog />
       <OpenFileDialog />
+      {pathOpenTarget && <PathOpenDialog target={pathOpenTarget} onClose={() => setPathOpenTarget(null)} />}
       <ConfirmDialog />
       <Toasts />
       <PromptDialog />

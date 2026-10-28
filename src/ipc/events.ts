@@ -4,6 +4,9 @@ import type { TerminalDataEvent, TransferProgressEvent } from '../types';
 export const onTerminalData = (handler: (payload: TerminalDataEvent) => void) =>
   listen<TerminalDataEvent>('terminal-data', (e) => handler(e.payload));
 
+export const onTerminalExit = (handler: (terminalId: string) => void) =>
+  listen<{ terminalId: string }>('terminal-exit', (e) => handler(e.payload.terminalId));
+
 export const onTransferProgress = (handler: (payload: TransferProgressEvent) => void) =>
   listen<TransferProgressEvent>('transfer-progress', (e) => handler(e.payload));
 

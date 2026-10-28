@@ -8,7 +8,6 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { confirm } from '../../../stores/confirmStore';
 import { useConnectionStore } from '../../../stores/connectionStore';
 import { useSettingsStore } from '../../../stores/settingsStore';
 import {
@@ -39,7 +38,7 @@ export default function TerminalSidebar({
   const createSession = useTerminalStore((s) => s.createSession);
   const splitNewTerminal = useTerminalStore((s) => s.splitNewTerminal);
   const splitTerminal = useTerminalStore((s) => s.splitTerminal);
-  const closeSession = useTerminalStore((s) => s.closeSession);
+  const requestCloseSession = useTerminalStore((s) => s.requestCloseSession);
   const renameTerminal = useTerminalStore((s) => s.renameTerminal);
   const setTerminalTheme = useTerminalStore((s) => s.setTerminalTheme);
   const setDraggingTerminal = useTerminalStore((s) => s.setDraggingTerminal);
@@ -94,15 +93,7 @@ export default function TerminalSidebar({
     setEditingId(null);
   };
 
-  const handleClose = async (id: string) => {
-    const ok = await confirm({
-      title: '터미널 닫기',
-      message: `'${titleOf(id)}' 터미널을 닫을까요? 실행 중인 셸과 작업이 종료됩니다.`,
-      confirmLabel: '닫기',
-      danger: true,
-    });
-    if (ok) closeSession(id);
-  };
+  const handleClose = (id: string) => { void requestCloseSession(id); };
 
   return (
     <div className={`${styles.sidebar} ${iconOnly ? styles.iconRail : ''}`}>

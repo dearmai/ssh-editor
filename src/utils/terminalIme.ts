@@ -37,6 +37,14 @@ export function createTerminalImeFallback(
   const onBeforeInput = (event: Event) => {
     const e = event as InputEvent;
     if (e.target !== textarea || composing || nativeEnding || e.isComposing) return;
+    // 미확정 한글 뒤 ASCII는 WebKit 입력 보완이 beforeinput을 취소해 input이 오지 않을 수 있다.
+    // 순서가 뒤바뀌거나 유실되지 않도록 미확정 글자를 먼저 확정한다.
+    if (active && pending && e.inputType === 'insertText' && e.data && /^[\x20-\x7e]+$/.test(e.data)) {
+      input(pending);
+      sent += pending;
+      pending = '';
+      preview('');
+    }
     if ((!active && isHangulInput(e)) || (active && !receivedInput)) {
       active = true;
       receivedInput = false;

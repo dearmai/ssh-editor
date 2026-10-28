@@ -41,6 +41,7 @@ function setup(choice = '취소', remaining = 0) {
     '@tauri-apps/plugin-dialog': { message },
     '../utils/confirmUnsavedChanges': { confirmUnsavedChanges },
     '../ipc/commands': { sshDisconnect },
+    '../utils/proxyJump': { parseProxyJump: () => [] },
     './editorStore': { useEditorStore: { getState: () => editor } },
     './terminalStore': { useTerminalStore: { getState: () => ({ closeConnectionSessions }) } },
     './fileTreeStore': { useFileTreeStore: { getState: () => ({ clearConnection }) } },

@@ -4,6 +4,7 @@ use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use dashmap::DashMap;
 use russh::ChannelMsg;
 use serde::Serialize;
+use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc::{self, UnboundedSender};
 
@@ -21,13 +22,13 @@ pub struct TerminalSession {
 }
 
 pub struct TerminalPool {
-    pub sessions: DashMap<String, TerminalSession>,
+    pub sessions: Arc<DashMap<String, TerminalSession>>,
 }
 
 impl TerminalPool {
     pub fn new() -> Self {
         Self {
-            sessions: DashMap::new(),
+            sessions: Arc::new(DashMap::new()),
         }
     }
 }
@@ -37,6 +38,12 @@ impl TerminalPool {
 struct TerminalDataEvent {
     terminal_id: String,
     data: String,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TerminalExitEvent {
+    terminal_id: String,
 }
 
 pub async fn create_terminal(
@@ -60,12 +67,21 @@ pub async fn create_terminal(
     let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<PtyCommand>();
     let tid = terminal_id.clone();
     let app_clone = app.clone();
+    let sessions = Arc::clone(&terminal_pool.sessions);
+    // 태스크가 즉시 종료되어도 종료된 핸들을 뒤늦게 등록하지 않는다.
+    sessions.insert(terminal_id.clone(), TerminalSession { cmd_tx });
 
     // 단일 태스크에서 stdin/stdout 모두 처리
     tokio::spawn(async move {
+        let mut shell_exited = false;
         loop {
             tokio::select! {
-                Some(cmd) = cmd_rx.recv() => {
+                cmd = cmd_rx.recv() => {
+                    let Some(cmd) = cmd else {
+                        // UI에서 핸들을 제거하면 실제 원격 PTY도 닫는다.
+                        let _ = channel.close().await;
+                        break;
+                    };
                     match cmd {
                         PtyCommand::Data(data) => {
                             if channel.data(data.as_slice()).await.is_err() {
@@ -92,17 +108,22 @@ pub async fn create_terminal(
                                 },
                             );
                         }
-                        Some(ChannelMsg::ExitStatus { .. }) | None => break,
+                        Some(ChannelMsg::ExitStatus { .. } | ChannelMsg::ExitSignal { .. } | ChannelMsg::Close) => {
+                            shell_exited = true;
+                            break;
+                        }
+                        None => break,
                         _ => {}
                     }
                 }
             }
         }
+        let was_live = sessions.remove(&tid).is_some();
+        // 통신 장애(None/전송 실패)는 재접속 시 복원할 수 있게 탭을 남긴다.
+        if shell_exited && was_live {
+            let _ = app_clone.emit("terminal-exit", TerminalExitEvent { terminal_id: tid });
+        }
     });
-
-    terminal_pool
-        .sessions
-        .insert(terminal_id.clone(), TerminalSession { cmd_tx });
 
     Ok(terminal_id)
 }
@@ -124,9 +145,8 @@ pub fn terminal_write(pool: &TerminalPool, terminal_id: &str, data_b64: &str) ->
 }
 
 pub fn terminal_close(pool: &TerminalPool, terminal_id: &str) -> AppResult<()> {
-    pool.sessions
-        .remove(terminal_id)
-        .ok_or_else(|| AppError::TerminalNotFound { id: terminal_id.to_string() })?;
+    // 원격 exit와 사용자 닫기가 경합해도 성공으로 처리한다.
+    pool.sessions.remove(terminal_id);
     Ok(())
 }
 
@@ -146,4 +166,20 @@ pub async fn terminal_resize(
         .send(PtyCommand::Resize { cols, rows })
         .map_err(|e| AppError::Other(format!("리사이즈 전송 실패: {}", e)))?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn closing_terminal_drops_command_sender_and_is_idempotent() {
+        let pool = TerminalPool::new();
+        let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel();
+        pool.sessions.insert("test".into(), TerminalSession { cmd_tx });
+        terminal_close(&pool, "test").unwrap();
+        assert!(pool.sessions.is_empty());
+        assert!(matches!(cmd_rx.try_recv(), Err(mpsc::error::TryRecvError::Disconnected)));
+        terminal_close(&pool, "test").unwrap();
+    }
 }

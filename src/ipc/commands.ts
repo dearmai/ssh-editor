@@ -52,6 +52,7 @@ export const deleteProfile = (id: string) =>
   invoke<void>('delete_profile', { id });
 
 // --- SFTP ---
+export const pathHome = (sessionId: string) => invoke<string>('path_home', { sessionId });
 export const sftpListDir = (sessionId: string, path: string) =>
   invoke<FileEntry[]>('sftp_list_dir', { sessionId, path });
 

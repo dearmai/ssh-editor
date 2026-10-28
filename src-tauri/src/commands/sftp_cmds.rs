@@ -6,6 +6,19 @@ use crate::ssh::{
 use base64::Engine;
 use tauri::{AppHandle, State};
 
+#[tauri::command]
+pub async fn path_home(session_id: String, pool: State<'_, SshConnectionPool>) -> AppResult<String> {
+    if session_id == "local" {
+        return dirs::home_dir()
+            .map(|path| path.to_string_lossy().replace('\\', "/"))
+            .ok_or_else(|| AppError::Other("홈 디렉토리를 찾을 수 없습니다".into()));
+    }
+    let session = pool.get(&session_id)?;
+    let guard = session.sftp.lock().await;
+    let sftp = guard.as_ref().ok_or_else(|| AppError::Other("SFTP 세션이 없습니다".into()))?;
+    Ok(sftp.canonicalize(".").await?)
+}
+
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LogChunk {

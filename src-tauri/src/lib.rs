@@ -106,13 +106,27 @@ pub fn run(startup_args: Option<StartupArgs>) {
             let word_wrap_item = MenuItemBuilder::with_id("toggle-word-wrap", "자동 줄바꿈")
                 .accelerator("Alt+Z")
                 .build(app)?;
+            let open_path_item = MenuItemBuilder::with_id("open-path", "경로로 파일 열기...")
+                .accelerator("CmdOrCtrl+P")
+                .build(app)?;
+            let file_menu = SubmenuBuilder::new(app, "파일").item(&open_path_item).build()?;
 
+            // macOS의 기본 copy:는 xterm의 자체 선택 영역을 인식하지 못할 수 있다.
+            // 포커스된 웹뷰로 전달해 터미널과 일반 에디터가 각자 처리하게 한다.
+            #[cfg(target_os = "macos")]
+            let copy_item = MenuItemBuilder::with_id("copy", "복사")
+                .accelerator("CmdOrCtrl+C")
+                .build(app)?;
             let edit_menu = SubmenuBuilder::new(app, "편집")
                 .undo()
                 .redo()
                 .separator()
-                .cut()
-                .copy()
+                .cut();
+            #[cfg(target_os = "macos")]
+            let edit_menu = edit_menu.item(&copy_item);
+            #[cfg(not(target_os = "macos"))]
+            let edit_menu = edit_menu.copy();
+            let edit_menu = edit_menu
                 .paste()
                 .select_all()
                 .build()?;
@@ -130,6 +144,7 @@ pub fn run(startup_args: Option<StartupArgs>) {
 
             let menu = MenuBuilder::new(app)
                 .item(&app_menu)
+                .item(&file_menu)
                 .item(&edit_menu)
                 .item(&view_menu)
                 .item(&window_menu)
@@ -144,7 +159,7 @@ pub fn run(startup_args: Option<StartupArgs>) {
                 "preferences" => {
                     app.emit("menu-preferences", ()).ok();
                 }
-                "toggle-word-wrap" => {
+                "toggle-word-wrap" | "copy" | "open-path" => {
                     // 전역 emit이면 모든 창이 토글되므로 포커스된 창에만 전달
                     // (get_focused_window는 tauri "unstable" feature라 is_focused로 탐색)
                     let focused = app
@@ -152,7 +167,12 @@ pub fn run(startup_args: Option<StartupArgs>) {
                         .into_values()
                         .find(|w| w.is_focused().unwrap_or(false));
                     if let Some(w) = focused {
-                        let _ = app.emit_to(w.label(), "menu-toggle-word-wrap", ());
+                        let event_name = match event.id().as_ref() {
+                            "copy" => "menu-copy",
+                            "open-path" => "menu-open-path",
+                            _ => "menu-toggle-word-wrap",
+                        };
+                        let _ = app.emit_to(w.label(), event_name, ());
                     }
                 }
                 "new-window" => {
@@ -189,6 +209,7 @@ pub fn run(startup_args: Option<StartupArgs>) {
             delete_profile,
             // SFTP
             sftp_list_dir,
+            path_home,
             sftp_read_file,
             sftp_log_chunk,
             sftp_log_search,

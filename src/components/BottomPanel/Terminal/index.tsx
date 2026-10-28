@@ -16,6 +16,7 @@ import { TerminalViewport } from '../../../utils/terminalViewport';
 import { createTerminalLinkOpener } from '../../../utils/terminalLinks';
 import { handleTerminalMultilineKey } from '../../../utils/terminalKeyboard';
 import { createTerminalImeFallback, needsTerminalImeFallback } from '../../../utils/terminalIme';
+import { installWebkitInputFix, needsWebkitInputFix } from '../../../utils/terminalWebkitInput';
 import { toastError } from '../../../stores/toastStore';
 import styles from './Terminal.module.css';
 
@@ -121,6 +122,8 @@ export default function TerminalPane({ sessionId, connectionId, visible = true }
     term.loadAddon(fitAddon);
     term.loadAddon(webLinksAddon);
     term.open(containerRef.current);
+    const disposeWebkitInputFix = needsWebkitInputFix(navigator.platform, navigator.userAgent)
+      ? installWebkitInputFix(container, term) : () => {};
 
     // Linux/Chromium의 표준 composition 경로는 xterm에 그대로 맡긴다.
     const imePreview = document.createElement('div');
@@ -167,6 +170,21 @@ export default function TerminalPane({ sessionId, connectionId, visible = true }
       void pasteClipboard(files);
     };
     container.addEventListener('paste', onPaste, true);
+    const copySelection = () => {
+      const selection = term.getSelection();
+      if (!selection) return false;
+      void writeClipboard(selection).catch((err) => {
+        log.error(`클립보드 복사 실패: ${String(err)}`);
+        toastError('선택한 텍스트를 복사하지 못했습니다.');
+      });
+      return true;
+    };
+    const onMenuCopy = (event: Event) => {
+      if (disposed || !copySelection()) return;
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    container.addEventListener('ssh-editor-copy', onMenuCopy);
     let restoreFrame = 0;
     let revision = 0;
     const canMeasure = () => !disposed && visibleRef.current
@@ -266,12 +284,8 @@ export default function TerminalPane({ sessionId, connectionId, visible = true }
       if (!mod) return true;
 
       if (key === 'c') {
-        const selection = term.getSelection();
         // 선택이 없으면 기본 동작(Ctrl+Shift+C 등)에 맡긴다
-        if (!selection) return true;
-        void writeClipboard(selection).catch((err) => {
-          log.error(`클립보드 복사 실패: ${String(err)}`);
-        });
+        if (!copySelection()) return true;
         e.preventDefault();
         return false;
       }
@@ -288,10 +302,12 @@ export default function TerminalPane({ sessionId, connectionId, visible = true }
     return () => {
       disposed = true;
       container.removeEventListener('paste', onPaste, true);
+      container.removeEventListener('ssh-editor-copy', onMenuCopy);
       container.removeAttribute('title');
       cancelAnimationFrame(restoreFrame);
       unlistenPromise.then((f) => f());
       observer.disconnect();
+      disposeWebkitInputFix();
       offResize.dispose();
       viewport.dispose();
       termRef.current = null;
@@ -316,7 +332,7 @@ export default function TerminalPane({ sessionId, connectionId, visible = true }
   return (
     <div className={styles.wrapper}>
       {uploadingImage && <div className={styles.uploadStatus} role="status">이미지 업로드 중…</div>}
-      <div ref={containerRef} className={styles.terminal} />
+      <div ref={containerRef} className={styles.terminal} data-terminal-id={sessionId} />
     </div>
   );
 }

@@ -3,6 +3,11 @@ import { terminalClose, terminalCreate, terminalWrite } from '../ipc/commands';
 import type { TerminalSessionInfo } from '../types';
 import { log } from './logStore';
 import { useFileTreeStore } from './fileTreeStore';
+import { confirm } from './confirmStore';
+import { toastError } from './toastStore';
+
+const pendingClose = new Set<string>();
+const earlyExits = new Set<string>();
 
 /** 셸 인용 (작은따옴표로 감싸고 내부 ' 는 '\'' 로 이스케이프) */
 function shellQuote(s: string): string {
@@ -21,6 +26,7 @@ async function spawnTerminal(
   cwd?: string
 ): Promise<TerminalSessionInfo> {
   const sessionId = await terminalCreate(connectionId, 80, 24);
+  if (earlyExits.delete(sessionId)) throw new Error('원격 셸이 시작 직후 종료되었습니다.');
   // 시작 디렉토리로 이동 (지정 cwd → 현재 세션 베이스 경로 → 실패 시 홈)
   const dir = cwd ?? useFileTreeStore.getState().rootPaths.get(connectionId);
   if (dir && dir !== '~') {
@@ -204,6 +210,9 @@ interface TerminalStore {
   /** cwd 지정 시 셸 시작 후 해당 경로로 이동 (실패하면 홈 유지). 미지정 시 세션 베이스 경로 사용 */
   createSession: (connectionId: string, title?: string, cwd?: string) => Promise<string>;
   closeSession: (sessionId: string) => Promise<void>;
+  requestCloseSession: (sessionId: string) => Promise<void>;
+  handleSessionExit: (sessionId: string) => void;
+  removeSession: (sessionId: string) => void;
   /** 해당 연결의 모든 터미널을 닫는다 (세션 종료 시) */
   closeConnectionSessions: (connectionId: string) => Promise<void>;
   /** 해당 연결의 죽은 터미널을 새 채널로 재생성한다 (재접속 후). 제목은 유지, scrollback은 초기화 */
@@ -261,6 +270,38 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
 
   closeSession: async (sessionId) => {
     await terminalClose(sessionId);
+    get().removeSession(sessionId);
+  },
+
+  requestCloseSession: async (sessionId) => {
+    const session = get().sessions.find((item) => item.id === sessionId);
+    if (!session || pendingClose.has(sessionId)) return;
+    pendingClose.add(sessionId);
+    try {
+      const approved = await confirm({
+        title: '터미널 닫기',
+        message: `'${session.title}' 터미널을 닫을까요? 실행 중인 셸과 작업이 종료됩니다.`,
+        confirmLabel: '닫기',
+        danger: true,
+      });
+      if (approved && get().sessions.some((item) => item.id === sessionId)) await get().closeSession(sessionId);
+    } catch (error) {
+      log.error(`터미널 닫기 실패: ${String(error)}`);
+      toastError(`터미널을 닫지 못했습니다: ${String(error)}`);
+    } finally { pendingClose.delete(sessionId); }
+  },
+
+  handleSessionExit: (sessionId) => {
+    if (!get().sessions.some((item) => item.id === sessionId)) {
+      // terminalCreate 응답보다 종료 이벤트가 먼저 온 경우도 처리한다.
+      earlyExits.add(sessionId);
+      if (earlyExits.size > 256) earlyExits.delete(earlyExits.values().next().value!);
+      return;
+    }
+    get().removeSession(sessionId);
+  },
+
+  removeSession: (sessionId) => {
     set((state) => {
       const sessions = state.sessions.filter((s) => s.id !== sessionId);
       const groups = state.groups
@@ -310,6 +351,7 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
         }
         try {
           const newId = await terminalCreate(connectionId, 80, 24);
+          if (earlyExits.delete(newId)) return null;
           const dir = useFileTreeStore.getState().rootPaths.get(connectionId);
           if (dir && dir !== '~') {
             const cmd = `cd ${shellQuote(dir)} 2>/dev/null || cd ~\n`;
@@ -326,7 +368,7 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
       let activeSessionId = state.activeSessionId;
       let groups = state.groups;
       for (const rep of replacements) {
-        if (!rep) continue;
+        if (!rep || earlyExits.delete(rep.info.id)) continue;
         sessions = sessions.map((s) => (s.id === rep.oldId ? rep.info : s));
         if (activeSessionId === rep.oldId) activeSessionId = rep.info.id;
         // 분할 트리의 리프 id도 새 id로 교체 (레이아웃 보존)
