@@ -1,5 +1,6 @@
 use crate::error::{AppError, AppResult};
 use crate::ssh::connection::{run_command, shell_quote};
+use crate::ssh::shell_fs;
 use crate::ssh::SshSession;
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -26,9 +27,13 @@ pub struct FileStat {
 
 pub async fn list_dir(session: &SshSession, path: &str) -> AppResult<Vec<FileEntry>> {
     let sftp_guard = session.sftp.lock().await;
-    let sftp = sftp_guard
-        .as_ref()
-        .ok_or_else(|| AppError::Other("SFTP 세션이 없습니다".to_string()))?;
+    let Some(sftp) = sftp_guard.as_ref() else {
+        drop(sftp_guard);
+        let tool = *session.stat_tool.lock().await;
+        let mut result = shell_fs::list_dir(session, tool, path).await?;
+        sort_entries(&mut result);
+        return Ok(result);
+    };
 
     let entries = sftp.read_dir(path).await?;
     let mut result: Vec<FileEntry> = entries
@@ -54,20 +59,35 @@ pub async fn list_dir(session: &SshSession, path: &str) -> AppResult<Vec<FileEnt
         })
         .collect();
 
-    result.sort_by(|a, b| {
+    sort_entries(&mut result);
+    Ok(result)
+}
+
+/// 폴더 우선, 이름 대소문자 무시 정렬
+fn sort_entries(entries: &mut [FileEntry]) {
+    entries.sort_by(|a, b| {
         b.is_dir
             .cmp(&a.is_dir)
             .then(a.name.to_lowercase().cmp(&b.name.to_lowercase()))
     });
+}
 
-    Ok(result)
+fn decode_text(content: Vec<u8>) -> AppResult<String> {
+    String::from_utf8(content)
+        .map_err(|_| AppError::Other("바이너리 파일은 편집할 수 없습니다".to_string()))
 }
 
 pub async fn read_file(session: &SshSession, path: &str) -> AppResult<String> {
     let sftp_guard = session.sftp.lock().await;
-    let sftp = sftp_guard
-        .as_ref()
-        .ok_or_else(|| AppError::Other("SFTP 세션이 없습니다".to_string()))?;
+    let Some(sftp) = sftp_guard.as_ref() else {
+        drop(sftp_guard);
+        let tool = *session.stat_tool.lock().await;
+        let size = shell_fs::stat(session, tool, path).await?.size;
+        if size > MAX_FILE_SIZE {
+            return Err(AppError::FileTooLarge { size });
+        }
+        return decode_text(shell_fs::read_bytes(session, path).await?);
+    };
 
     // 크기 먼저 확인
     let stat = sftp.metadata(path).await?;
@@ -80,16 +100,16 @@ pub async fn read_file(session: &SshSession, path: &str) -> AppResult<String> {
     let mut file = sftp.open(path).await?;
     let mut content = Vec::new();
     file.read_to_end(&mut content).await?;
-
-    String::from_utf8(content)
-        .map_err(|_| AppError::Other("바이너리 파일은 편집할 수 없습니다".to_string()))
+    decode_text(content)
 }
 
 pub async fn stat(session: &SshSession, path: &str) -> AppResult<FileStat> {
     let sftp_guard = session.sftp.lock().await;
-    let sftp = sftp_guard
-        .as_ref()
-        .ok_or_else(|| AppError::Other("SFTP 세션이 없습니다".to_string()))?;
+    let Some(sftp) = sftp_guard.as_ref() else {
+        drop(sftp_guard);
+        let tool = *session.stat_tool.lock().await;
+        return shell_fs::stat(session, tool, path).await;
+    };
 
     let m = sftp.metadata(path).await?;
     Ok(FileStat {
@@ -100,9 +120,12 @@ pub async fn stat(session: &SshSession, path: &str) -> AppResult<FileStat> {
 
 pub async fn write_file(session: &SshSession, path: &str, content: &str) -> AppResult<FileStat> {
     let sftp_guard = session.sftp.lock().await;
-    let sftp = sftp_guard
-        .as_ref()
-        .ok_or_else(|| AppError::Other("SFTP 세션이 없습니다".to_string()))?;
+    let Some(sftp) = sftp_guard.as_ref() else {
+        drop(sftp_guard);
+        shell_fs::write_bytes(session, path, content.as_bytes(), false).await?;
+        let tool = *session.stat_tool.lock().await;
+        return shell_fs::stat(session, tool, path).await;
+    };
 
     let mut file = sftp.create(path).await?;
     file.write_all(content.as_bytes()).await?;
@@ -118,9 +141,10 @@ pub async fn write_file(session: &SshSession, path: &str, content: &str) -> AppR
 
 pub async fn create_file(session: &SshSession, path: &str) -> AppResult<()> {
     let sftp_guard = session.sftp.lock().await;
-    let sftp = sftp_guard
-        .as_ref()
-        .ok_or_else(|| AppError::Other("SFTP 세션이 없습니다".to_string()))?;
+    let Some(sftp) = sftp_guard.as_ref() else {
+        drop(sftp_guard);
+        return shell_fs::create_file(session, path).await;
+    };
 
     let mut file = sftp.create(path).await?;
     file.flush().await?;
@@ -129,9 +153,10 @@ pub async fn create_file(session: &SshSession, path: &str) -> AppResult<()> {
 
 pub async fn delete_path(session: &SshSession, path: &str) -> AppResult<()> {
     let sftp_guard = session.sftp.lock().await;
-    let sftp = sftp_guard
-        .as_ref()
-        .ok_or_else(|| AppError::Other("SFTP 세션이 없습니다".to_string()))?;
+    let Some(sftp) = sftp_guard.as_ref() else {
+        drop(sftp_guard);
+        return shell_fs::delete_path(session, path).await;
+    };
 
     let stat = sftp.metadata(path).await?;
     if stat.is_dir() {
@@ -144,9 +169,10 @@ pub async fn delete_path(session: &SshSession, path: &str) -> AppResult<()> {
 
 pub async fn rename_path(session: &SshSession, from: &str, to: &str) -> AppResult<()> {
     let sftp_guard = session.sftp.lock().await;
-    let sftp = sftp_guard
-        .as_ref()
-        .ok_or_else(|| AppError::Other("SFTP 세션이 없습니다".to_string()))?;
+    let Some(sftp) = sftp_guard.as_ref() else {
+        drop(sftp_guard);
+        return shell_fs::rename_path(session, from, to).await;
+    };
 
     sftp.rename(from, to).await?;
     Ok(())
@@ -170,9 +196,10 @@ pub async fn copy_path(session: &SshSession, from: &str, to: &str) -> AppResult<
 /// 경로 존재 여부 (업로드/이동 전 이름 충돌 사전 점검용)
 pub async fn exists(session: &SshSession, path: &str) -> AppResult<bool> {
     let sftp_guard = session.sftp.lock().await;
-    let sftp = sftp_guard
-        .as_ref()
-        .ok_or_else(|| AppError::Other("SFTP 세션이 없습니다".to_string()))?;
+    let Some(sftp) = sftp_guard.as_ref() else {
+        drop(sftp_guard);
+        return shell_fs::exists(session, path).await;
+    };
 
     Ok(sftp.metadata(path).await.is_ok())
 }
@@ -186,9 +213,10 @@ pub async fn check_write_access(session: &SshSession, dir: &str) -> AppResult<bo
 
 pub async fn create_dir(session: &SshSession, path: &str) -> AppResult<()> {
     let sftp_guard = session.sftp.lock().await;
-    let sftp = sftp_guard
-        .as_ref()
-        .ok_or_else(|| AppError::Other("SFTP 세션이 없습니다".to_string()))?;
+    let Some(sftp) = sftp_guard.as_ref() else {
+        drop(sftp_guard);
+        return shell_fs::create_dir(session, path).await;
+    };
 
     sftp.create_dir(path).await?;
     Ok(())

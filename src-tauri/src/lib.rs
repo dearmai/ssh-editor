@@ -201,6 +201,7 @@ pub fn run(startup_args: Option<StartupArgs>) {
             ssh_ping,
             ssh_health_check,
             ssh_reconnect,
+            ssh_file_access,
             open_new_window,
             get_active_connections,
             load_ssh_config,

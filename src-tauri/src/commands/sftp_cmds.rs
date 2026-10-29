@@ -1,6 +1,7 @@
 use crate::error::{AppError, AppResult};
 use crate::ssh::connection::{run_command, shell_quote};
 use crate::ssh::{
+    shell_fs,
     sftp, transfer, FileEntry, FileStat, ProbeResult, SshConnectionPool, TransferCancelState,
 };
 use base64::Engine;
@@ -15,7 +16,10 @@ pub async fn path_home(session_id: String, pool: State<'_, SshConnectionPool>) -
     }
     let session = pool.get(&session_id)?;
     let guard = session.sftp.lock().await;
-    let sftp = guard.as_ref().ok_or_else(|| AppError::Other("SFTP 세션이 없습니다".into()))?;
+    let Some(sftp) = guard.as_ref() else {
+        drop(guard);
+        return shell_fs::home(&session).await;
+    };
     Ok(sftp.canonicalize(".").await?)
 }
 

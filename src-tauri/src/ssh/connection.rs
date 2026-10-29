@@ -1,6 +1,7 @@
 use crate::config::{AuthMethod, ConnectionProfile};
 use crate::error::{AppError, AppResult};
 use crate::ssh::proxy;
+use crate::ssh::shell_fs::{self, StatTool};
 use dashmap::DashMap;
 use russh::client;
 use russh::client::AuthResult;
@@ -25,7 +26,10 @@ pub struct SshSession {
     pub id: String,
     pub profile: ConnectionProfile,
     pub handle: Mutex<client::Handle<SshClientHandler>>,
+    /// None이면 SFTP 서브시스템을 쓸 수 없는 서버 — 파일 작업은 셸 대체 경로(`shell_fs`) 사용
     pub sftp: Mutex<Option<SftpSession>>,
+    /// 셸 대체 경로의 파일 정보 조회 수단 (SFTP 사용 시 의미 없음)
+    pub stat_tool: Mutex<StatTool>,
     /// 점프 호스트 핸들 — 최종 세션의 터널이 살아 있도록 보관만 한다
     pub jumps: Mutex<Vec<client::Handle<SshClientHandler>>>,
 }
@@ -179,13 +183,14 @@ pub async fn ssh_connect_inner(profile: ConnectionProfile) -> AppResult<Arc<SshS
 }
 
 async fn ssh_connect_impl(profile: ConnectionProfile) -> AppResult<Arc<SshSession>> {
-    let (handle, sftp, jumps) = establish(&profile).await?;
+    let (handle, files, jumps) = establish(&profile).await?;
     let id = uuid::Uuid::new_v4().to_string();
     let session = Arc::new(SshSession {
         id,
         profile,
         handle: Mutex::new(handle),
-        sftp: Mutex::new(Some(sftp)),
+        sftp: Mutex::new(files.sftp),
+        stat_tool: Mutex::new(files.stat_tool),
         jumps: Mutex::new(jumps),
     });
     Ok(session)
@@ -199,11 +204,61 @@ struct Hop<'a> {
     auth: &'a AuthMethod,
 }
 
+/// 접속 시 판정한 파일 접근 방식
+struct FileAccess {
+    sftp: Option<SftpSession>,
+    stat_tool: StatTool,
+}
+
 type Established = (
     client::Handle<SshClientHandler>,
-    SftpSession,
+    FileAccess,
     Vec<client::Handle<SshClientHandler>>,
 );
+
+/// SFTP 서브시스템 열기. 거부 응답을 직접 확인해 막힌 서버에서 오래 기다리지 않는다.
+async fn open_sftp(handle: &client::Handle<SshClientHandler>) -> Result<SftpSession, String> {
+    use russh::ChannelMsg;
+
+    let init = async {
+        let mut channel = handle.channel_open_session().await.map_err(|e| e.to_string())?;
+        channel
+            .request_subsystem(true, "sftp")
+            .await
+            .map_err(|e| e.to_string())?;
+        loop {
+            match channel.wait().await {
+                Some(ChannelMsg::Success) => break,
+                Some(ChannelMsg::Failure) => return Err("서버가 sftp 서브시스템을 거부함".to_string()),
+                Some(ChannelMsg::Eof | ChannelMsg::Close) | None => {
+                    return Err("sftp 채널이 닫힘".to_string())
+                }
+                _ => {}
+            }
+        }
+        SftpSession::new(channel.into_stream())
+            .await
+            .map_err(|e| e.to_string())
+    };
+    tokio::time::timeout(std::time::Duration::from_secs(10), init)
+        .await
+        .map_err(|_| "SFTP 초기화 시간 초과 (10초)".to_string())?
+}
+
+/// SFTP → 셸 대체 경로 순으로 파일 접근 수단을 판정한다. 둘 다 안 되면 접속 실패.
+async fn detect_file_access(handle: &client::Handle<SshClientHandler>) -> AppResult<FileAccess> {
+    let sftp_err = match open_sftp(handle).await {
+        Ok(sftp) => return Ok(FileAccess { sftp: Some(sftp), stat_tool: StatTool::Gnu }),
+        Err(e) => e,
+    };
+    match shell_fs::probe(handle).await {
+        Ok(stat_tool) => Ok(FileAccess { sftp: None, stat_tool }),
+        Err(shell_err) => Err(AppError::Other(format!(
+            "원격 파일 접근 불가 — SFTP: {} / 셸 대체 경로: {}",
+            sftp_err, shell_err
+        ))),
+    }
+}
 
 /// 프로필로 새 SSH 핸들과 SFTP 세션을 생성한다 (프록시·점프 호스트 경유 + 인증 + SFTP 초기화).
 /// 최초 접속과 재접속에서 공통으로 사용한다. 점프 호스트 핸들은 터널 유지를 위해 함께 반환한다.
@@ -256,12 +311,8 @@ async fn establish(profile: &ConnectionProfile) -> AppResult<Established> {
         jumps.push(std::mem::replace(&mut handle, next));
     }
 
-    // SFTP 서브시스템 초기화
-    let sftp_channel = handle.channel_open_session().await?;
-    sftp_channel.request_subsystem(true, "sftp").await?;
-    let sftp = SftpSession::new(sftp_channel.into_stream()).await?;
-
-    Ok((handle, sftp, jumps))
+    let files = detect_file_access(&handle).await?;
+    Ok((handle, files, jumps))
 }
 
 async fn authenticate(handle: &mut client::Handle<SshClientHandler>, hop: &Hop<'_>) -> AppResult<()> {
@@ -321,7 +372,7 @@ async fn authenticate(handle: &mut client::Handle<SshClientHandler>, hop: &Hop<'
 /// 기존 세션을 동일한 sessionId로 재접속한다 (핸들/SFTP를 새 연결로 교체).
 /// sessionId가 그대로이므로 에디터 탭·파일트리 등 프론트의 connectionId 참조가 유지된다.
 pub async fn reconnect_session(session: &SshSession) -> AppResult<()> {
-    let (handle, sftp, jumps) = tokio::time::timeout(
+    let (handle, files, jumps) = tokio::time::timeout(
         std::time::Duration::from_secs(20),
         establish(&session.profile),
     )
@@ -329,7 +380,8 @@ pub async fn reconnect_session(session: &SshSession) -> AppResult<()> {
     .map_err(|_| AppError::Other("재접속 시간 초과 (20초)".to_string()))??;
 
     *session.handle.lock().await = handle;
-    *session.sftp.lock().await = Some(sftp);
+    *session.sftp.lock().await = files.sftp;
+    *session.stat_tool.lock().await = files.stat_tool;
     *session.jumps.lock().await = jumps;
     Ok(())
 }

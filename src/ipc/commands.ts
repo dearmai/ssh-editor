@@ -32,6 +32,10 @@ export const sshHealthCheck = (sessionId: string) =>
 export const sshReconnect = (sessionId: string) =>
   invoke<void>('ssh_reconnect', { sessionId });
 
+/** 파일 접근 방식: 'sftp' 또는 SFTP 차단 서버용 셸 대체 경로('shell-gnu' | 'shell-bsd' | 'shell-perl') */
+export const sshFileAccess = (sessionId: string) =>
+  invoke<string>('ssh_file_access', { sessionId });
+
 export const openNewWindow = () =>
   invoke<void>('open_new_window');
 

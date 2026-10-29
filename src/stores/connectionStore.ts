@@ -12,6 +12,7 @@ import {
   sshDisconnect,
   sshHealthCheck,
   sshReconnect,
+  sshFileAccess,
 } from '../ipc/commands';
 import type { ActiveConnection, ConnectionProfile, SshConfigHost } from '../types';
 import { log } from './logStore';
@@ -117,6 +118,13 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => ({
         selectedSessionId: sessionId,
       }));
       log.info(`연결됨: ${profile.name} (${profile.hostname})`);
+      sshFileAccess(sessionId)
+        .then((mode) => {
+          if (mode !== 'sftp') {
+            log.warn(`SFTP 서브시스템 사용 불가 — 셸 명령으로 파일 접근 (${mode}): ${profile.hostname}`);
+          }
+        })
+        .catch(() => {});
       // 최초 접속 시 기본 터미널 1개 생성 (세션 시작 경로에서 시작)
       const base = startPath ?? profile.directories?.[0] ?? profile.lastPath;
       useTerminalStore

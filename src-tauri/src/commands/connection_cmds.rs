@@ -1,5 +1,6 @@
 use crate::config::{parse_ssh_config, ConnectionProfile, SshConfigHost};
 use crate::error::{AppError, AppResult};
+use crate::ssh::shell_fs::StatTool;
 use crate::ssh::{ping_server, reconnect_session, ssh_connect_inner, PingInfo, SshConnectionPool};
 use serde::{Deserialize, Serialize};
 use tauri::{State, WebviewUrl, WebviewWindowBuilder};
@@ -84,6 +85,24 @@ pub async fn ssh_reconnect(
 ) -> AppResult<()> {
     let session = pool.get(&session_id)?;
     reconnect_session(&session).await
+}
+
+/// 세션의 파일 접근 방식: "sftp" 또는 셸 대체 경로("shell-gnu" | "shell-bsd" | "shell-perl")
+#[tauri::command]
+pub async fn ssh_file_access(
+    session_id: String,
+    pool: State<'_, SshConnectionPool>,
+) -> AppResult<String> {
+    let session = pool.get(&session_id)?;
+    if session.sftp.lock().await.is_some() {
+        return Ok("sftp".to_string());
+    }
+    let mode = match *session.stat_tool.lock().await {
+        StatTool::Gnu => "shell-gnu",
+        StatTool::Bsd => "shell-bsd",
+        StatTool::Perl => "shell-perl",
+    };
+    Ok(mode.to_string())
 }
 
 #[tauri::command]

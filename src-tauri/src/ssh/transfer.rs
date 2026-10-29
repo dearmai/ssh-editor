@@ -1,5 +1,6 @@
 use crate::error::{AppError, AppResult};
 use crate::ssh::connection::{run_command, shell_quote};
+use crate::ssh::shell_fs;
 use crate::ssh::SshSession;
 use dashmap::DashMap;
 use russh::ChannelMsg;
@@ -103,9 +104,13 @@ fn split_path(p: &str) -> (&str, &str) {
 /// 파일 크기 + 바이너리 여부 (앞 8KB에 NUL 포함 여부로 판정)
 pub async fn probe(session: &SshSession, path: &str) -> AppResult<ProbeResult> {
     let sftp_guard = session.sftp.lock().await;
-    let sftp = sftp_guard
-        .as_ref()
-        .ok_or_else(|| AppError::Other("SFTP 세션이 없습니다".to_string()))?;
+    let Some(sftp) = sftp_guard.as_ref() else {
+        drop(sftp_guard);
+        let tool = *session.stat_tool.lock().await;
+        let size = shell_fs::stat(session, tool, path).await?.size;
+        let head = shell_fs::read_head(session, path, 8192).await?;
+        return Ok(ProbeResult { size, is_binary: head.contains(&0) });
+    };
 
     let meta = sftp.metadata(path).await?;
     let size = meta.size.unwrap_or(0);
@@ -131,9 +136,10 @@ pub async fn upload(
     let mut local = tokio::fs::File::open(local_path).await?;
 
     let sftp_guard = session.sftp.lock().await;
-    let sftp = sftp_guard
-        .as_ref()
-        .ok_or_else(|| AppError::Other("SFTP 세션이 없습니다".to_string()))?;
+    let Some(sftp) = sftp_guard.as_ref() else {
+        drop(sftp_guard);
+        return upload_via_shell(app, session, &mut local, remote_path, id, cancel, total).await;
+    };
     let mut remote = sftp.create(remote_path).await?;
 
     let mut buf = vec![0u8; CHUNK];
@@ -182,9 +188,16 @@ pub async fn upload_data_chunk(
     is_last: bool,
 ) -> AppResult<()> {
     let sftp_guard = session.sftp.lock().await;
-    let sftp = sftp_guard
-        .as_ref()
-        .ok_or_else(|| AppError::Other("SFTP 세션이 없습니다".to_string()))?;
+    let Some(sftp) = sftp_guard.as_ref() else {
+        drop(sftp_guard);
+        let started = Instant::now();
+        shell_fs::write_bytes(session, remote_path, data, offset != 0).await?;
+        let transferred = offset + data.len() as u64;
+        let speed = calc_speed(data.len() as u64, started.elapsed());
+        let status = if is_last { "done" } else { "active" };
+        emit_progress(app, id, transferred, total, status, None, speed);
+        return Ok(());
+    };
 
     let flags = if offset == 0 {
         OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE
@@ -213,9 +226,11 @@ pub async fn upload_data_chunk(
 /// 진행 중인 청크 업로드 취소 시 프론트가 호출 — 원격에 남은 부분 파일 정리
 pub async fn abort_upload_data_chunk(session: &SshSession, remote_path: &str) -> AppResult<()> {
     let sftp_guard = session.sftp.lock().await;
-    let sftp = sftp_guard
-        .as_ref()
-        .ok_or_else(|| AppError::Other("SFTP 세션이 없습니다".to_string()))?;
+    let Some(sftp) = sftp_guard.as_ref() else {
+        drop(sftp_guard);
+        shell_fs::remove_file_quiet(session, remote_path).await;
+        return Ok(());
+    };
     let _ = sftp.remove_file(remote_path).await;
     Ok(())
 }
@@ -230,9 +245,10 @@ pub async fn download_file(
     cancel: &Arc<AtomicBool>,
 ) -> AppResult<()> {
     let sftp_guard = session.sftp.lock().await;
-    let sftp = sftp_guard
-        .as_ref()
-        .ok_or_else(|| AppError::Other("SFTP 세션이 없습니다".to_string()))?;
+    let Some(sftp) = sftp_guard.as_ref() else {
+        drop(sftp_guard);
+        return download_via_shell(app, session, remote_path, local_path, id, cancel).await;
+    };
 
     let total = sftp.metadata(remote_path).await?.size.unwrap_or(0);
     let mut remote = sftp.open(remote_path).await?;
@@ -266,6 +282,116 @@ pub async fn download_file(
         }
     }
     local.flush().await?;
+    emit_progress(app, id, transferred, total, "done", None, 0.0);
+    Ok(())
+}
+
+/// SFTP 없는 서버: `cat > 원격경로`의 stdin으로 스트리밍 업로드
+async fn upload_via_shell(
+    app: &AppHandle,
+    session: &SshSession,
+    local: &mut tokio::fs::File,
+    remote_path: &str,
+    id: &str,
+    cancel: &Arc<AtomicBool>,
+    total: u64,
+) -> AppResult<()> {
+    let cmd = shell_fs::sh_command("cat > \"$1\"", &[remote_path]);
+    let channel = {
+        let handle = session.handle.lock().await;
+        shell_fs::open_exec(&handle, &cmd).await?
+    };
+
+    let mut buf = vec![0u8; CHUNK];
+    let mut transferred = 0u64;
+    let mut last_bytes = 0u64;
+    let mut last = Instant::now();
+    emit_progress(app, id, 0, total, "active", None, 0.0);
+
+    loop {
+        if cancel.load(Ordering::Relaxed) {
+            let _ = channel.close().await;
+            shell_fs::remove_file_quiet(session, remote_path).await;
+            emit_progress(app, id, transferred, total, "canceled", None, 0.0);
+            return Ok(());
+        }
+        let n = local.read(&mut buf).await?;
+        if n == 0 {
+            break;
+        }
+        channel.data(&buf[..n]).await?;
+        transferred += n as u64;
+        if last.elapsed().as_millis() >= EMIT_INTERVAL_MS {
+            let speed = calc_speed(transferred - last_bytes, last.elapsed());
+            emit_progress(app, id, transferred, total, "active", None, speed);
+            last = Instant::now();
+            last_bytes = transferred;
+        }
+    }
+    channel.eof().await?;
+    shell_fs::collect(channel).await.check("업로드")?;
+    emit_progress(app, id, transferred, total, "done", None, 0.0);
+    Ok(())
+}
+
+/// SFTP 없는 서버: `cat 원격경로`의 stdout을 스트리밍 다운로드
+async fn download_via_shell(
+    app: &AppHandle,
+    session: &SshSession,
+    remote_path: &str,
+    local_path: &str,
+    id: &str,
+    cancel: &Arc<AtomicBool>,
+) -> AppResult<()> {
+    let tool = *session.stat_tool.lock().await;
+    let total = shell_fs::stat(session, tool, remote_path).await?.size;
+    let cmd = shell_fs::sh_command("cat \"$1\"", &[remote_path]);
+    let mut channel = {
+        let handle = session.handle.lock().await;
+        shell_fs::open_exec(&handle, &cmd).await?
+    };
+    channel.eof().await?;
+    let mut local = tokio::fs::File::create(local_path).await?;
+
+    let mut transferred = 0u64;
+    let mut last_bytes = 0u64;
+    let mut last = Instant::now();
+    let mut stderr = Vec::new();
+    let mut code = None;
+    emit_progress(app, id, 0, total, "active", None, 0.0);
+
+    loop {
+        if cancel.load(Ordering::Relaxed) {
+            let _ = channel.close().await;
+            drop(local);
+            let _ = tokio::fs::remove_file(local_path).await;
+            emit_progress(app, id, transferred, total, "canceled", None, 0.0);
+            return Ok(());
+        }
+        match channel.wait().await {
+            Some(ChannelMsg::Data { data }) => {
+                local.write_all(&data).await?;
+                transferred += data.len() as u64;
+                if last.elapsed().as_millis() >= EMIT_INTERVAL_MS {
+                    let speed = calc_speed(transferred - last_bytes, last.elapsed());
+                    emit_progress(app, id, transferred, total, "active", None, speed);
+                    last = Instant::now();
+                    last_bytes = transferred;
+                }
+            }
+            Some(ChannelMsg::ExtendedData { data, .. }) => stderr.extend_from_slice(&data),
+            Some(ChannelMsg::ExitStatus { exit_status }) => code = Some(exit_status),
+            Some(ChannelMsg::Close) | None => break,
+            _ => {}
+        }
+    }
+    local.flush().await?;
+    drop(local);
+    if code != Some(0) {
+        let _ = tokio::fs::remove_file(local_path).await;
+        let output = shell_fs::ExecOutput { stdout: Vec::new(), stderr, code };
+        output.check("다운로드")?;
+    }
     emit_progress(app, id, transferred, total, "done", None, 0.0);
     Ok(())
 }
