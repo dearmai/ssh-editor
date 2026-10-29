@@ -18,6 +18,7 @@ export default function MonacoPane({ tabId }: Props) {
   const tab = useEditorStore((s) => s.tabsById[tabId]);
   const editorFontFamily = useSettingsStore((s) => s.editorFontFamily);
   const editorFontSize = useSettingsStore((s) => s.editorFontSize);
+  const editorLineHeight = useSettingsStore((s) => s.editorLineHeight);
   const minimapEnabled = useSettingsStore((s) => s.minimapEnabled);
   const resolvedTheme = useSettingsStore((s) => s.resolvedTheme);
   const darkTheme = useSettingsStore((s) => s.darkTheme);
@@ -46,7 +47,7 @@ export default function MonacoPane({ tabId }: Props) {
   // (WKWebView는 폰트 로드 전 측정하면 fallback 폰트 metrics로 그려 터미널과 달라 보임)
   useEffect(() => {
     editorRef.current?.remeasureFonts?.();
-  }, [editorFontFamily, editorFontSize]);
+  }, [editorFontFamily, editorFontSize, editorLineHeight]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -90,6 +91,8 @@ export default function MonacoPane({ tabId }: Props) {
         options={{
           fontSize: editorFontSize,
           fontFamily: editorFontFamily,
+          // 0~8 값은 Monaco가 글꼴 크기의 배수로 해석
+          lineHeight: editorLineHeight,
           lineNumbers: 'on',
           // 복사 시 문법 강조(색상) HTML을 함께 담지 않고 순수 텍스트만 클립보드에 넣는다
           copyWithSyntaxHighlighting: false,

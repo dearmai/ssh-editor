@@ -31,6 +31,8 @@ export interface Settings {
   /** 에디터 폰트 (monospace) */
   editorFontFamily: string;
   editorFontSize: number;
+  /** 에디터 줄 높이 (글꼴 크기 배수) */
+  editorLineHeight: number;
   /** 터미널 폰트 (monospace) — 에디터와 별개 */
   terminalFontFamily: string;
   terminalFontSize: number;
@@ -89,6 +91,7 @@ const DEFAULTS: Settings = {
   uiFontSize: 13,
   editorFontFamily: DEFAULT_MONO_FONT,
   editorFontSize: 14,
+  editorLineHeight: 1.5,
   terminalFontFamily: DEFAULT_MONO_FONT,
   terminalFontSize: 14,
   logLevelFilter: 'all',

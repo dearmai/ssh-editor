@@ -282,10 +282,29 @@ export default function SettingsDialog({ open, onClose }: Props) {
                       onChange={(e) => s.set('editorFontSize', Number(e.target.value) || 14)}
                     />
                   </div>
+                  <div className={styles.field} style={{ width: 90 }}>
+                    <label className={styles.label}>줄 높이 (배수)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={3}
+                      step={0.1}
+                      value={s.editorLineHeight}
+                      onChange={(e) => {
+                        const v = Number(e.target.value);
+                        s.set('editorLineHeight', v ? Math.min(3, Math.max(1, v)) : 1.5);
+                      }}
+                    />
+                  </div>
                 </div>
 
-                <div className={styles.preview} style={{ fontFamily: s.editorFontFamily, fontSize: s.editorFontSize }}>
+                <div
+                  className={styles.preview}
+                  style={{ fontFamily: s.editorFontFamily, fontSize: s.editorFontSize, lineHeight: s.editorLineHeight }}
+                >
                   const greeting = "안녕하세요";  // 미리보기 0Oo1lI
+                  <br />
+                  return greeting;
                 </div>
 
                 {/* 터미널 폰트 (에디터와 별개) */}
