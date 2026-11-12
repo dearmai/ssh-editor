@@ -1,0 +1,7 @@
+FROM docker.io/library/debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends openssh-server && rm -rf /var/lib/apt/lists/* \
+    && useradd -m -s /bin/bash tester && echo 'tester:test-only-password' | chpasswd \
+    && mkdir -p /run/sshd && ssh-keygen -A
+COPY sshd_config /etc/ssh/sshd_config
+EXPOSE 22
+CMD ["/usr/sbin/sshd", "-D", "-e"]

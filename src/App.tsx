@@ -18,6 +18,8 @@ import EditorArea from './components/EditorArea';
 import SidePanel from './components/SidePanel';
 import TerminalPanel from './components/TerminalPanel';
 import SettingsDialog from './components/Dialogs/SettingsDialog';
+import ReleaseNotesDialog from './components/Dialogs/ReleaseNotesDialog';
+import { version } from '../package.json';
 import SaveConflictDialog from './components/Dialogs/SaveConflictDialog';
 import OpenFileDialog from './components/Dialogs/OpenFileDialog';
 import PathOpenDialog, { type PathOpenTarget } from './components/Dialogs/PathOpenDialog';
@@ -70,6 +72,7 @@ export default function App() {
   const { loadAll, selectedSessionId, activeConnections } = useConnectionStore();
   const rootPaths = useFileTreeStore((s) => s.rootPaths);
   const [showSettings, setShowSettings] = useState(false);
+  const [showReleaseNotes, setShowReleaseNotes] = useState(false);
   const [pathOpenTarget, setPathOpenTarget] = useState<PathOpenTarget | null>(null);
 
   useEffect(() => {
@@ -181,6 +184,7 @@ export default function App() {
     log.info('SSH Editor 시작됨');
 
     const unlistenPrefs = listen('menu-preferences', () => setShowSettings(true));
+    const unlistenReleaseNotes = listen('menu-release-notes', () => setShowReleaseNotes(true));
     const unlistenCopy = listen('menu-copy', () => {
       // 활성 요소에서 버블링하므로 다른 터미널/숨긴 탭의 선택을 복사하지 않는다.
       const event = new Event('ssh-editor-copy', { bubbles: true, cancelable: true });
@@ -193,6 +197,7 @@ export default function App() {
     const unlistenTerminalExit = onTerminalExit((id) => useTerminalStore.getState().handleSessionExit(id));
     return () => {
       unlistenPrefs.then((fn) => fn());
+      unlistenReleaseNotes.then((fn) => fn());
       unlistenCopy.then((fn) => fn());
       unlistenTransfer.then((fn) => fn());
       unlistenTerminalExit.then((fn) => fn());
@@ -450,6 +455,14 @@ export default function App() {
               : 'SSH Editor'}
           </span>
           {selectedSessionId && <ServerStatus sessionId={selectedSessionId} />}
+          <button
+            className={styles.statusBtn}
+            onClick={() => setShowReleaseNotes(true)}
+            title="버전 수정 내역"
+            aria-label={`버전 수정 내역 — SSH Editor ${version}`}
+          >
+            v{version}
+          </button>
           <TransferStatus />
 
           <div className={styles.statusRight}>
@@ -484,6 +497,7 @@ export default function App() {
       </div>
 
       <SettingsDialog open={showSettings} onClose={() => setShowSettings(false)} />
+      <ReleaseNotesDialog open={showReleaseNotes} onClose={() => setShowReleaseNotes(false)} />
       <SaveConflictDialog />
       <OpenFileDialog />
       {pathOpenTarget && <PathOpenDialog target={pathOpenTarget} onClose={() => setPathOpenTarget(null)} />}

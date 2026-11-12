@@ -1,0 +1,21 @@
+.content {
+  width: 760px;
+}
+
+.version {
+  margin-top: 5px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.notes {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  user-select: text;
+}
+
+.notes:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}

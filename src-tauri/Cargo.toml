@@ -1,6 +1,6 @@
 [package]
 name = "ssh-editor"
-version = "0.1.0"
+version = "0.1.1"
 description = "SSH Remote File Editor"
 authors = ["rinjae"]
 edition = "2021"

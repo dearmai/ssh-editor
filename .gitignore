@@ -39,6 +39,7 @@ pnpm-debug.log*
 docs/*
 !docs/windows-build.md
 !docs/codesign.md
+!docs/work-log-0.1.1.md
 
 # ── 코드 서명 개인 키 (docs/codesign.md) ───────
 *.pfx

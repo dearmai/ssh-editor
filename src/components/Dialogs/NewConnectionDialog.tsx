@@ -6,6 +6,7 @@ import { useFileTreeStore } from '../../stores/fileTreeStore';
 import type { AuthType, ConnectionProfile, ProxyType, SshConfigHost } from '../../types';
 import { parseProxyJump } from '../../utils/proxyJump';
 import styles from './Dialog.module.css';
+import PasswordInput from './PasswordInput';
 
 interface JumpForm {
   hostname: string;
@@ -365,8 +366,7 @@ export default function NewConnectionDialog({ open, onClose, editProfile }: Prop
             {form.authType === 'password' && (
               <div className={styles.field}>
                 <label className={styles.label}>비밀번호</label>
-                <input
-                  type="password"
+                <PasswordInput
                   value={form.password}
                   onChange={(e) => set('password', e.target.value)}
                   autoComplete="current-password"
@@ -453,8 +453,7 @@ export default function NewConnectionDialog({ open, onClose, editProfile }: Prop
                           <option value="password">비밀번호</option>
                         </select>
                         {j.authType === 'password' && (
-                          <input
-                            type="password"
+                          <PasswordInput
                             value={j.password}
                             onChange={(e) => setJump(i, { password: e.target.value })}
                             placeholder="비밀번호"
@@ -532,8 +531,7 @@ export default function NewConnectionDialog({ open, onClose, editProfile }: Prop
                       </div>
                       <div className={styles.field} style={{ flex: 1 }}>
                         <label className={styles.label}>프록시 비밀번호</label>
-                        <input
-                          type="password"
+                        <PasswordInput
                           value={proxy.password}
                           onChange={(e) => setProxyField({ password: e.target.value })}
                           autoComplete="off"

@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use ssh::{SshConnectionPool, TerminalPool};
 use std::collections::HashSet;
 use std::sync::Mutex;
-use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
+use tauri::menu::{AboutMetadata, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,6 +30,49 @@ pub struct StartupArgsState(pub Mutex<Option<StartupArgs>>);
 /// 종료 확인 대기 중인 창 라벨 집합. None이면 종료 절차가 진행 중이 아니다.
 /// 모든 창이 승인(exit_vote(true))해야 실제로 종료하고, 한 창이라도 취소하면 절차를 접는다.
 pub struct ExitVoteState(pub Mutex<Option<HashSet<String>>>);
+
+/// Native menu activation can temporarily clear the OS focused-window flag.
+/// Keep the last focused label so menu actions still reach the initiating window.
+struct MenuWindowState(Mutex<Option<String>>);
+
+fn menu_window_label<'a>(labels: &'a [String], focused: Option<&str>, last: Option<&str>) -> Option<&'a str> {
+    [focused, last, Some("main")]
+        .into_iter()
+        .flatten()
+        .find_map(|label| labels.iter().find(|candidate| candidate.as_str() == label))
+        .or_else(|| labels.first())
+        .map(String::as_str)
+}
+
+fn menu_window(app: &tauri::AppHandle) -> Option<tauri::WebviewWindow> {
+    let windows = app.webview_windows();
+    let focused = windows.values().find(|window| window.is_focused().unwrap_or(false));
+    let last = app.state::<MenuWindowState>().0.lock().unwrap().clone();
+    let labels = windows.keys().cloned().collect::<Vec<_>>();
+    menu_window_label(&labels, focused.map(|window| window.label()), last.as_deref())
+        .and_then(|label| windows.get(label).cloned())
+}
+
+#[cfg(test)]
+mod menu_tests {
+    use super::menu_window_label;
+
+    #[test]
+    fn menu_targets_current_or_last_focused_window() {
+        let labels = vec!["main".into(), "secondary".into()];
+        assert_eq!(menu_window_label(&labels, Some("main"), Some("secondary")), Some("main"));
+        // Native menus can temporarily leave no webview window focused.
+        assert_eq!(menu_window_label(&labels, None, Some("secondary")), Some("secondary"));
+    }
+
+    #[test]
+    fn menu_targets_surviving_window_when_last_window_closed() {
+        let labels = vec!["main".into(), "secondary".into()];
+        assert_eq!(menu_window_label(&labels, None, Some("closed")), Some("main"));
+        assert_eq!(menu_window_label(&["secondary".into()], None, Some("closed")), Some("secondary"));
+        assert_eq!(menu_window_label(&[], None, Some("closed")), None);
+    }
+}
 
 /// 종료 절차 시작 — 열린 모든 창에 확인을 요청한다 (미저장 문서 저장·확인은 프론트가 수행)
 fn start_exit_flow(app: &tauri::AppHandle) {
@@ -75,6 +118,7 @@ pub fn run(startup_args: Option<StartupArgs>) {
             std::env::args().skip(1),
         ))))
         .manage(ExitVoteState(Mutex::new(None)))
+        .manage(MenuWindowState(Mutex::new(None)))
         .setup(|app| {
             let prefs_item = MenuItemBuilder::with_id("preferences", "환경설정...")
                 .accelerator("CmdOrCtrl+,")
@@ -88,8 +132,17 @@ pub fn run(startup_args: Option<StartupArgs>) {
                 .accelerator("CmdOrCtrl+Q")
                 .build(app)?;
 
+            let release_notes_item = MenuItemBuilder::with_id("release-notes", "버전 수정 내역...")
+                .build(app)?;
             let app_menu = SubmenuBuilder::new(app, "SSH Editor")
-                .about(None)
+                .about(Some(AboutMetadata {
+                    name: Some("SSH Editor".into()),
+                    version: Some(app.package_info().version.to_string()),
+                    authors: Some(vec![env!("CARGO_PKG_AUTHORS").into()]),
+                    comments: Some("SSH 원격 파일 편집기".into()),
+                    ..Default::default()
+                }))
+                .item(&release_notes_item)
                 .separator()
                 .item(&prefs_item)
                 .item(&new_window_item)
@@ -159,17 +212,14 @@ pub fn run(startup_args: Option<StartupArgs>) {
                 "preferences" => {
                     app.emit("menu-preferences", ()).ok();
                 }
-                "toggle-word-wrap" | "copy" | "open-path" => {
+                "toggle-word-wrap" | "copy" | "open-path" | "release-notes" => {
                     // 전역 emit이면 모든 창이 토글되므로 포커스된 창에만 전달
                     // (get_focused_window는 tauri "unstable" feature라 is_focused로 탐색)
-                    let focused = app
-                        .webview_windows()
-                        .into_values()
-                        .find(|w| w.is_focused().unwrap_or(false));
-                    if let Some(w) = focused {
+                    if let Some(w) = menu_window(app) {
                         let event_name = match event.id().as_ref() {
                             "copy" => "menu-copy",
                             "open-path" => "menu-open-path",
+                            "release-notes" => "menu-release-notes",
                             _ => "menu-toggle-word-wrap",
                         };
                         let _ = app.emit_to(w.label(), event_name, ());
@@ -249,6 +299,14 @@ pub fn run(startup_args: Option<StartupArgs>) {
         .build(tauri::generate_context!())
         .expect("SSH Editor 실행 오류")
         .run(|app, event| {
+            if let tauri::RunEvent::WindowEvent {
+                label,
+                event: tauri::WindowEvent::Focused(true),
+                ..
+            } = &event
+            {
+                *app.state::<MenuWindowState>().0.lock().unwrap() = Some(label.clone());
+            }
             #[cfg(any(target_os = "macos", target_os = "ios"))]
             if let tauri::RunEvent::Opened { urls } = &event {
                 let files = urls

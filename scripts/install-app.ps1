@@ -1,6 +1,6 @@
 ﻿# SSH Editor - Windows 설치파일 빌드 후 실행 스크립트
-# Makefile의 `make setup`이 호출함.
-# tauri build로 NSIS/MSI 설치파일을 만든 뒤, 만들어진 설치 마법사를 실행한다.
+# Makefile의 `make install` / `make setup`이 호출함.
+# tauri build로 NSIS/MSI 설치파일을 만든 뒤, 무인 설치한다.
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
@@ -34,11 +34,20 @@ if (-not $installer) {
 }
 
 Write-Host ""
-Write-Host "[2/2] 설치 마법사 실행: $($installer.FullName)" -ForegroundColor Green
+Write-Host "[2/2] 무인 설치: $($installer.FullName)" -ForegroundColor Green
 if ($installer.Extension -ieq '.msi') {
-    Start-Process 'msiexec.exe' -ArgumentList '/i', "`"$($installer.FullName)`"" -Wait
+    $installProcess = Start-Process 'msiexec.exe' -ArgumentList '/i', "`"$($installer.FullName)`"", '/qn', '/norestart' -WindowStyle Hidden -Wait -PassThru
+    $successCodes = @(0, 3010)
 } else {
-    Start-Process $installer.FullName -Wait
+    $installProcess = Start-Process -FilePath $installer.FullName -ArgumentList '/S' -WindowStyle Hidden -Wait -PassThru
+    $successCodes = @(0)
+}
+
+if ($installProcess.ExitCode -notin $successCodes) {
+    throw "무인 설치 실패 (exit $($installProcess.ExitCode)): $($installer.FullName)"
+}
+if ($installProcess.ExitCode -eq 3010) {
+    Write-Warning '설치는 완료되었으나 적용을 마치려면 Windows를 다시 시작해야 합니다. 자동 재시작하지 않습니다.'
 }
 
 Write-Host ""

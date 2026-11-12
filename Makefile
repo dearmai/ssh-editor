@@ -8,7 +8,7 @@
 #    make env-setup    개발 도구 자동 설치 (Win: winget / mac: brew+rustup)
 #    make deps         npm 의존성 설치
 #    make install      빌드 후 설치
-#                        Win: NSIS/MSI 설치 마법사 실행
+#                        Win: NSIS/MSI 무인 설치
 #                        mac: .app 빌드 후 /Applications 에 설치
 #    make dev          개발 모드 실행
 #    make build        배포 빌드 (설치파일/번들만 생성)
@@ -56,7 +56,7 @@ env-setup:
 deps:
 	npm install
 
-# 빌드 후 설치 (NSIS/MSI 설치 마법사 실행)
+# 빌드 후 무인 설치 (NSIS /S, MSI /qn /norestart)
 install: deps
 	@$(PS) scripts/install-app.ps1
 

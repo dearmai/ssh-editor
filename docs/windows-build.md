@@ -167,7 +167,10 @@ powershell -ExecutionPolicy Bypass -File scripts/install-app.ps1
 ```
 
 `install-app.ps1`은 `npm run tauri:build` 후 **NSIS `*-setup.exe` 우선**, 없으면 MSI를 찾아
-설치 마법사를 실행합니다. 완료 후 시작 메뉴에서 `SSH Editor` 실행.
+설치 화면 없이 무인 설치합니다(NSIS `/S`, MSI `/qn /norestart`).
+설치 종료 코드를 확인하며 실패하면 `make install`도 실패합니다.
+MSI가 재시작 필요 코드(3010)를 반환하면 안내만 표시하고 자동 재시작하지 않습니다.
+빌드 진행 로그는 터미널에 표시됩니다. 완료 후 시작 메뉴에서 `SSH Editor`를 실행하세요.
 
 ## 7. 아이콘 재생성
 

@@ -5,6 +5,9 @@ pub mod shell_fs;
 pub mod terminal;
 pub mod transfer;
 
+#[cfg(test)]
+mod no_sftp_tests;
+
 pub use connection::*;
 pub use sftp::{FileEntry, FileStat};
 pub use terminal::*;

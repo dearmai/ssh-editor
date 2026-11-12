@@ -35,7 +35,7 @@ fi
 BIN_NAME="ssh-editor"        # Cargo package name → 바이너리 이름
 APP_NAME="SSH Editor"        # productName → .app 이름
 BUNDLE_ID="io.rinjae.ssh-editor"
-APP_VERSION="0.1.0"
+APP_VERSION="0.1.1"
 
 # ── 인자 파싱 ─────────────────────────────────────────────────
 MODE="debug"

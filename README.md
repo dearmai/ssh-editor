@@ -1,5 +1,7 @@
 # SSH Editor
 
+현재 버전: **0.1.1** · [버전 수정 내역](CHANGELOG.md) · [0.1.1 작업내역서](docs/work-log-0.1.1.md)
+
 VSCode 스타일의 **SSH 원격 파일 에디터**. Tauri v2 + React + Monaco Editor + Rust(russh) 기반으로, 원격 서버의 파일을 로컬 에디터처럼 탐색·편집하고 통합 터미널을 사용할 수 있는 데스크탑 앱입니다.
 
 ## 주요 기능
