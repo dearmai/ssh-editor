@@ -1,5 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { Indent, Palette, Plus, RotateCcw, Type, X } from 'lucide-react';
+import { FileSymlink, Indent, Palette, Plus, RotateCcw, Type, X } from 'lucide-react';
 import {
   applyUiFont,
   DEFAULT_MONO_FONT,
@@ -11,6 +11,8 @@ import { useMemo, useState, useEffect } from 'react';
 import { Monitor, Moon, Sun } from 'lucide-react';
 import { DEFAULT_INDENT, TAB_SIZES, type IndentRule } from '../../utils/indent';
 import { DARK_THEMES, LIGHT_THEMES, type ColorTheme } from '../../themes';
+import { isFileAssocPlatform } from '../../utils/fileAssociations';
+import FileAssocPanel from './FileAssocPanel';
 import styles from './Dialog.module.css';
 
 const THEME_OPTS: { mode: ThemeMode; label: string; Icon: typeof Moon }[] = [
@@ -118,12 +120,16 @@ function IndentCell({
   );
 }
 
-type SettingsTab = 'appearance' | 'font' | 'indent';
+type SettingsTab = 'appearance' | 'font' | 'indent' | 'fileAssoc';
 
 const TABS: { id: SettingsTab; label: string; Icon: typeof Type }[] = [
   { id: 'appearance', label: '테마', Icon: Palette },
   { id: 'font', label: '폰트', Icon: Type },
   { id: 'indent', label: '들여쓰기', Icon: Indent },
+  // 파일 연결 관리는 Windows 전용
+  ...(isFileAssocPlatform()
+    ? [{ id: 'fileAssoc' as const, label: '파일 연결', Icon: FileSymlink }]
+    : []),
 ];
 
 interface Props {
@@ -387,7 +393,11 @@ export default function SettingsDialog({ open, onClose }: Props) {
               </>
             )}
 
+            {tab === 'fileAssoc' && <FileAssocPanel />}
+
             <div className={styles.buttons}>
+              {/* 파일 연결은 레지스트리에 즉시 반영되므로 '기본값' 초기화 대상이 아님 */}
+              {tab !== 'fileAssoc' && (
               <button
                 type="button"
                 className={styles.cancelBtn}
@@ -399,6 +409,7 @@ export default function SettingsDialog({ open, onClose }: Props) {
                 <RotateCcw size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
                 기본값
               </button>
+              )}
               <button type="button" className={styles.submitBtn} onClick={onClose}>
                 완료
               </button>

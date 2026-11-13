@@ -178,3 +178,22 @@ export const getStartupArgs = () =>
 // --- 로컬 작업 폴더 / 운영체제 파일 연결 ---
 export const takeOpenFiles = () => invoke<string[]>('take_open_files');
 export const localListDir = (path: string) => invoke<FileEntry[]>('local_list_dir', { path });
+
+// --- 운영체제 파일 연결 관리 (Windows) ---
+export interface FileAssocStatus {
+  ext: string;
+  /** '연결 프로그램' 목록에 SSH Editor 등록 여부 */
+  registered: boolean;
+  /** 현재 기본 앱이 SSH Editor인지 */
+  isDefault: boolean;
+  /** 현재 기본 앱 이름 */
+  defaultApp: string | null;
+}
+export interface FileAssocReport {
+  supported: boolean;
+  items: FileAssocStatus[];
+}
+export const fileAssocStatus = (exts: string[]) => invoke<FileAssocReport>('file_assoc_status', { exts });
+export const fileAssocSet = (exts: string[], enabled: boolean) =>
+  invoke<void>('file_assoc_set', { exts, enabled });
+export const fileAssocOpenDefaults = () => invoke<void>('file_assoc_open_defaults');

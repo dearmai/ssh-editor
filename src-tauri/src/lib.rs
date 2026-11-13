@@ -1,6 +1,8 @@
 mod commands;
 mod config;
 mod error;
+mod file_assoc;
+use file_assoc::{file_assoc_open_defaults, file_assoc_set, file_assoc_status};
 mod local_files;
 use local_files::*;
 mod ssh;
@@ -120,6 +122,7 @@ pub fn run(startup_args: Option<StartupArgs>) {
         .manage(ExitVoteState(Mutex::new(None)))
         .manage(MenuWindowState(Mutex::new(None)))
         .setup(|app| {
+            file_assoc::startup_maintenance();
             let prefs_item = MenuItemBuilder::with_id("preferences", "환경설정...")
                 .accelerator("CmdOrCtrl+,")
                 .build(app)?;
@@ -295,6 +298,10 @@ pub fn run(startup_args: Option<StartupArgs>) {
             get_startup_args,
             read_clipboard_uploads,
             exit_vote,
+            // 파일 연결 (Windows)
+            file_assoc_status,
+            file_assoc_set,
+            file_assoc_open_defaults,
         ])
         .build(tauri::generate_context!())
         .expect("SSH Editor 실행 오류")
