@@ -5,7 +5,7 @@
 #  주요 타깃:
 #    make              도움말
 #    make env-check    개발 도구 설치 여부 점검 (누락 시 비정상 종료)
-#    make env-setup    개발 도구 자동 설치 (Win: winget / mac: brew+rustup)
+#    make env-setup    개발 도구 자동 설치 (Win: D:/devtools 에 직접 다운로드 / mac: brew+rustup)
 #    make deps         npm 의존성 설치
 #    make install      빌드 후 설치
 #                        Win: NSIS/MSI 무인 설치
@@ -18,7 +18,7 @@
 #    make clean        빌드 산출물 정리
 #
 #  ⚠ Windows에는 make가 기본 탑재되지 않음:
-#       winget install GnuWin32.Make   (또는 ezwinports.make)
+#       env-setup 스크립트가 D:/devtools/make 에 설치함 (아래 첫 명령)
 #     make 없이 직접 실행할 수도 있음:
 #       powershell -ExecutionPolicy Bypass -File scripts/check-env.ps1
 #       powershell -ExecutionPolicy Bypass -File scripts/setup-env.ps1

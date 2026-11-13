@@ -5,6 +5,13 @@
 $ErrorActionPreference = 'Continue'
 $root = Split-Path -Parent $PSScriptRoot
 
+# setup-env.ps1이 방금 등록한 사용자 PATH/CARGO_HOME 등을 새 셸 없이 반영
+$env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('Path', 'User')
+foreach ($v in 'CARGO_HOME', 'RUSTUP_HOME', 'DEVTOOLS_ROOT') {
+    $val = [Environment]::GetEnvironmentVariable($v, 'User')
+    if ($val) { Set-Item "env:$v" $val }
+}
+
 function Test-Tool {
     param([string]$Name, [string]$Cmd, [string]$VersionArgs = '--version', [string]$Hint)
     $found = Get-Command $Cmd -ErrorAction SilentlyContinue
@@ -26,14 +33,14 @@ Write-Host ""
 $ok = $true
 
 # 1) Rust / cargo
-if (-not (Test-Tool 'Rust (cargo)' 'cargo' '--version' 'winget install Rustlang.Rustup')) { $ok = $false }
+if (-not (Test-Tool 'Rust (cargo)' 'cargo' '--version' 'make env-setup')) { $ok = $false }
 
 # 2) Node / npm
-if (-not (Test-Tool 'Node.js' 'node' '--version' 'winget install OpenJS.NodeJS.LTS')) { $ok = $false }
+if (-not (Test-Tool 'Node.js' 'node' '--version' 'https://nodejs.org 에서 LTS 설치')) { $ok = $false }
 if (-not (Test-Tool 'npm' 'npm' '--version' 'Node.js와 함께 설치됨')) { $ok = $false }
 
 # 3) NASM (aws-lc-sys 어셈블리 빌드에 필수)
-if (-not (Test-Tool 'NASM' 'nasm' '-v' 'winget install NASM.NASM + PATH 등록')) { $ok = $false }
+if (-not (Test-Tool 'NASM' 'nasm' '-v' 'make env-setup')) { $ok = $false }
 
 # 3b) CMake (aws-lc-sys가 CC 빌더 대신 CMake 빌더로 폴백할 때 필수)
 #     항상 필요한 건 아니라 경고만 — 없으면 'Missing dependency: cmake'로 빌드가 멈출 수 있음
@@ -42,7 +49,7 @@ if (Get-Command cmake -ErrorAction SilentlyContinue) {
     try { $cmakeVer = (& cmake --version 2>$null | Select-Object -First 1) } catch {}
     Write-Host ("  [OK]   {0,-18} {1}" -f 'CMake', $cmakeVer) -ForegroundColor Green
 } else {
-    Write-Host ("  [WARN] {0,-18} {1}" -f 'CMake', 'aws-lc-sys가 CMake 빌더로 폴백하면 필수 (winget install Kitware.CMake)') -ForegroundColor Yellow
+    Write-Host ("  [WARN] {0,-18} {1}" -f 'CMake', 'aws-lc-sys가 CMake 빌더로 폴백하면 필수 (make env-setup)') -ForegroundColor Yellow
 }
 
 # 4) MSVC 링커 (link.exe) - VS Build Tools
@@ -59,7 +66,7 @@ if ($link) {
         $ok = $false
     }
 } else {
-    Write-Host ("  [MISS] {0,-18} {1}" -f 'MSVC 링커', 'winget install Microsoft.VisualStudio.2022.BuildTools') -ForegroundColor Red
+    Write-Host ("  [MISS] {0,-18} {1}" -f 'MSVC 링커', 'make env-setup (관리자 셸, VS Build Tools)') -ForegroundColor Red
     $ok = $false
 }
 
@@ -97,6 +104,6 @@ if ($ok) {
     Write-Host "==> 빌드 가능. 'npm run tauri:dev' (개발) / 'npm run tauri:build' (.msi/NSIS)" -ForegroundColor Green
     exit 0
 } else {
-    Write-Host "==> 누락 도구 있음. 'make setup' 실행 후 새 셸에서 다시 점검하세요." -ForegroundColor Red
+    Write-Host "==> 누락 도구 있음. 'make env-setup' 실행 후 새 셸에서 다시 점검하세요." -ForegroundColor Red
     exit 1
 }

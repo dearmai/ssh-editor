@@ -5,6 +5,13 @@
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 
+# setup-env.ps1이 등록한 사용자 PATH/CARGO_HOME 등을 새 셸 없이 반영
+$env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('Path', 'User')
+foreach ($v in 'CARGO_HOME', 'RUSTUP_HOME', 'DEVTOOLS_ROOT') {
+    $val = [Environment]::GetEnvironmentVariable($v, 'User')
+    if ($val) { Set-Item "env:$v" $val }
+}
+
 Write-Host ""
 Write-Host "==== SSH Editor - 설치파일 빌드 & 설치 (Windows) ====" -ForegroundColor Cyan
 Write-Host ""
