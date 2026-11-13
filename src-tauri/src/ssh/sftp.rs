@@ -5,6 +5,8 @@ use crate::ssh::SshSession;
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
+/// 테스트용 기본 한도 — 앱은 설정값을 read_file_limited 로 넘긴다
+#[cfg(test)]
 const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024; // 10MB
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -77,30 +79,43 @@ fn decode_text(content: Vec<u8>) -> AppResult<String> {
         .map_err(|_| AppError::Other("바이너리 파일은 편집할 수 없습니다".to_string()))
 }
 
+#[cfg(test)]
 pub async fn read_file(session: &SshSession, path: &str) -> AppResult<String> {
+    read_file_limited(session, path, MAX_FILE_SIZE).await
+}
+
+/// 크기 한도(바이트)를 지정해 텍스트 파일 전체를 읽는다 (앱 설정의 원격 대용량 파일 한도)
+pub async fn read_file_limited(session: &SshSession, path: &str, limit: u64) -> AppResult<String> {
+    decode_text(read_bytes_limited(session, path, limit).await?)
+}
+
+pub async fn read_bytes_limited(session: &SshSession, path: &str, limit: u64) -> AppResult<Vec<u8>> {
     let sftp_guard = session.sftp.lock().await;
     let Some(sftp) = sftp_guard.as_ref() else {
         drop(sftp_guard);
         let tool = *session.stat_tool.lock().await;
         let size = shell_fs::stat(session, tool, path).await?.size;
-        if size > MAX_FILE_SIZE {
+        if size > limit {
             return Err(AppError::FileTooLarge { size });
         }
-        return decode_text(shell_fs::read_bytes(session, path).await?);
+        let bytes = shell_fs::read_bytes(session, path).await?;
+        if bytes.len() as u64 > limit { return Err(AppError::FileTooLarge { size: bytes.len() as u64 }); }
+        return Ok(bytes);
     };
 
     // 크기 먼저 확인
     let stat = sftp.metadata(path).await?;
     if let Some(size) = stat.size {
-        if size > MAX_FILE_SIZE {
+        if size > limit {
             return Err(AppError::FileTooLarge { size });
         }
     }
 
-    let mut file = sftp.open(path).await?;
+    let file = sftp.open(path).await?;
     let mut content = Vec::new();
-    file.read_to_end(&mut content).await?;
-    decode_text(content)
+    file.take(limit + 1).read_to_end(&mut content).await?;
+    if content.len() as u64 > limit { return Err(AppError::FileTooLarge { size: content.len() as u64 }); }
+    Ok(content)
 }
 
 pub async fn stat(session: &SshSession, path: &str) -> AppResult<FileStat> {
@@ -119,16 +134,20 @@ pub async fn stat(session: &SshSession, path: &str) -> AppResult<FileStat> {
 }
 
 pub async fn write_file(session: &SshSession, path: &str, content: &str) -> AppResult<FileStat> {
+    write_bytes(session, path, content.as_bytes()).await
+}
+
+pub async fn write_bytes(session: &SshSession, path: &str, content: &[u8]) -> AppResult<FileStat> {
     let sftp_guard = session.sftp.lock().await;
     let Some(sftp) = sftp_guard.as_ref() else {
         drop(sftp_guard);
-        shell_fs::write_bytes(session, path, content.as_bytes(), false).await?;
+        shell_fs::write_bytes(session, path, content, false).await?;
         let tool = *session.stat_tool.lock().await;
         return shell_fs::stat(session, tool, path).await;
     };
 
     let mut file = sftp.create(path).await?;
-    file.write_all(content.as_bytes()).await?;
+    file.write_all(content).await?;
     file.flush().await?;
     drop(file);
 

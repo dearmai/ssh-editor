@@ -18,12 +18,13 @@ npm run build            # 프론트엔드만 (tsc + vite) — 타입 검증용
 cd src-tauri && cargo check   # Rust 타입 검증
 
 make install             # 번들 빌드 → /Applications 설치 (scripts/install-app.sh, setup 은 별칭)
+make portable            # Windows 무설치판 → build/windows-portable/ssh-editor.exe
 make deps                # npm 의존성 설치
 make                     # 전체 타깃 도움말
 npm run icons            # icons/icon.svg → icns/ico/png 재생성 (tauri icon)
 ```
 
-빌드 산출물: `build/debug/` · `build/release/` (`SSH Editor.app` + `ssh-editor` 바이너리).
+빌드 산출물: `build/debug/` · `build/release/` (`SSH Editor.app` + `ssh-editor` 바이너리). Windows: 설치판 `build/windows/`, 포터블 `build/windows-portable/`, 서명판 `build/windows-signed/`.
 
 ## 아키텍처
 

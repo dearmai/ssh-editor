@@ -129,7 +129,7 @@ powershell -ExecutionPolicy Bypass -File scripts\build-signed.ps1 -Portable    #
 ## 4. 서명 확인
 
 ```powershell
-Get-AuthenticodeSignature '.\SSH Editor_0.1.1_x64-setup.exe' |
+Get-AuthenticodeSignature '.\SSH Editor_0.2.0_x64-setup.exe' |
   Select-Object Status, @{n='Signer';e={$_.SignerCertificate.Subject}}, @{n='Timestamp';e={[bool]$_.TimeStamperCertificate}}
 ```
 

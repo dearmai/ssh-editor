@@ -6,7 +6,8 @@ pub struct PendingFiles(pub Mutex<Vec<String>>);
 
 pub fn cli_files(args: impl IntoIterator<Item = String>) -> Vec<String> {
     let args: Vec<_> = args.into_iter().collect();
-    if args.first().is_some_and(|a| a == "--profile") {
+    // --profile 실행과 탐색기 보관/해제 요청은 "파일 열기"가 아니다
+    if args.first().is_some_and(|a| a == "--profile" || a == crate::local_crypto::SEAL_FLAG) {
         return vec![];
     }
     args.into_iter()
@@ -50,19 +51,26 @@ pub fn local_stat(path: String) -> AppResult<FileStat> {
     stat(&path)
 }
 
+/// 텍스트 파일 전체를 읽는다. `limit`은 앱 설정의 대용량 파일 한도(바이트)이며
+/// 생략하면 16MB, 최대 `file_view::MAX_OPEN_LIMIT`로 제한한다.
 #[tauri::command]
-pub fn local_read_file(path: String) -> AppResult<String> {
-    const LIMIT: u64 = 16 * 1024 * 1024;
+pub fn local_read_file(path: String, limit: Option<u64>) -> AppResult<String> {
+    let limit = crate::file_view::clamp_limit(limit);
     if !std::fs::metadata(&path)?.is_file() {
         return Err(AppError::Other("일반 파일이 아닙니다".into()));
     }
     let file = std::fs::File::open(&path)?;
     let mut bytes = Vec::new();
-    file.take(LIMIT + 1).read_to_end(&mut bytes)?;
-    if bytes.len() as u64 > LIMIT {
+    file.take(limit + 1).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > limit {
         return Err(AppError::FileTooLarge {
             size: bytes.len() as u64,
         });
+    }
+    if crate::local_crypto::is_sealed(&bytes) {
+        return Err(AppError::Other(
+            "보관된 파일입니다. 파일 트리에서 우클릭 → 보관 해제 후 여세요".into(),
+        ));
     }
     if bytes.contains(&0) {
         return Err(AppError::Other(
@@ -128,19 +136,19 @@ mod tests {
         assert_eq!(result.len(), 2);
         assert_eq!(result[0], result[1]);
         assert!(cli_files(vec!["--profile".into(), "test".into(), result[0].clone()]).is_empty());
-        assert_eq!(local_read_file(result[0].clone()).unwrap(), "안녕하세요");
+        assert_eq!(local_read_file(result[0].clone(), None).unwrap(), "안녕하세요");
         let updated = local_write_file(result[0].clone(), "수정된 내용".into()).unwrap();
         assert_eq!(updated.size, "수정된 내용".len() as u64);
-        assert_eq!(local_read_file(result[0].clone()).unwrap(), "수정된 내용");
+        assert_eq!(local_read_file(result[0].clone(), None).unwrap(), "수정된 내용");
         let entries =
             local_list_dir(path.parent().unwrap().to_string_lossy().into_owned()).unwrap();
         assert!(entries
             .iter()
             .any(|entry| entry.path == result[0] && !entry.is_dir));
         std::fs::write(&path, [0xff, 0xfe]).unwrap();
-        assert!(local_read_file(result[0].clone()).is_err());
+        assert!(local_read_file(result[0].clone(), None).is_err());
         std::fs::write(&path, [0, 1, 2]).unwrap();
-        assert!(local_read_file(result[0].clone()).is_err());
+        assert!(local_read_file(result[0].clone(), None).is_err());
         std::fs::remove_file(path).unwrap();
     }
 }

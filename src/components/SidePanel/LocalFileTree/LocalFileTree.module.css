@@ -11,3 +11,7 @@
 .children { padding-left: 14px; }
 .spacer { width: 13px; flex-shrink: 0; }
 .error { padding: 8px; color: var(--text-secondary); overflow-wrap: anywhere; }
+.contextMenu { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 4px; padding: 4px; min-width: 140px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4); z-index: 100; }
+.contextItem { display: flex; align-items: center; gap: 8px; padding: 5px 10px; font-size: 12px; color: var(--text-primary); border-radius: 3px; cursor: pointer; outline: none; }
+.contextItem:hover, .contextItem[data-highlighted] { background: var(--accent); color: white; }
+.contextHeader { padding: 4px 10px 5px; font-size: 10px; color: var(--text-muted); }

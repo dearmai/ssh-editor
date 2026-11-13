@@ -166,3 +166,16 @@
   background: var(--border);
   margin: 4px 0;
 }
+
+/* eco: 메모리에서 해제된 탭 표시 */
+.eco {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+.ecoNote {
+  align-self: center;
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  padding: 0 4px;
+}

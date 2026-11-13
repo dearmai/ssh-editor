@@ -1,10 +1,12 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { FileSymlink, Indent, Palette, Plus, RotateCcw, Type, X } from 'lucide-react';
+import { FileSymlink, FolderOpen, Indent, Lock, Palette, Plus, RotateCcw, Type, X } from 'lucide-react';
 import {
   applyUiFont,
   DEFAULT_MONO_FONT,
   DEFAULT_UI_FONT,
+  MAX_OPEN_MB,
   useSettingsStore,
+  type Settings,
   type ThemeMode,
 } from '../../stores/settingsStore';
 import { useMemo, useState, useEffect } from 'react';
@@ -13,6 +15,7 @@ import { DEFAULT_INDENT, TAB_SIZES, type IndentRule } from '../../utils/indent';
 import { DARK_THEMES, LIGHT_THEMES, type ColorTheme } from '../../themes';
 import { isFileAssocPlatform } from '../../utils/fileAssociations';
 import FileAssocPanel from './FileAssocPanel';
+import { explorerMenuSet, explorerMenuStatus } from '../../ipc/commands';
 import styles from './Dialog.module.css';
 
 const THEME_OPTS: { mode: ThemeMode; label: string; Icon: typeof Moon }[] = [
@@ -120,12 +123,14 @@ function IndentCell({
   );
 }
 
-type SettingsTab = 'appearance' | 'font' | 'indent' | 'fileAssoc';
+type SettingsTab = 'appearance' | 'font' | 'indent' | 'fileOpen' | 'features' | 'fileAssoc';
 
 const TABS: { id: SettingsTab; label: string; Icon: typeof Type }[] = [
   { id: 'appearance', label: '테마', Icon: Palette },
   { id: 'font', label: '폰트', Icon: Type },
   { id: 'indent', label: '들여쓰기', Icon: Indent },
+  { id: 'fileOpen', label: '파일 열기', Icon: FolderOpen },
+  { id: 'features', label: '기능', Icon: Lock },
   // 파일 연결 관리는 Windows 전용
   ...(isFileAssocPlatform()
     ? [{ id: 'fileAssoc' as const, label: '파일 연결', Icon: FileSymlink }]
@@ -135,6 +140,116 @@ const TABS: { id: SettingsTab; label: string; Icon: typeof Type }[] = [
 interface Props {
   open: boolean;
   onClose: () => void;
+}
+
+type LimitKey = 'localNormalMB' | 'localLargeMB' | 'remoteNormalMB' | 'remoteLargeMB' | 'ecoThresholdMB';
+
+/** 용량(MB) 입력 — 입력 중엔 그대로 두고, 벗어날 때 범위를 맞춘다 */
+function MbInput({ k, label }: { k: LimitKey; label: string }) {
+  const value = useSettingsStore((s) => s[k]);
+  const set = useSettingsStore((s) => s.set);
+  const [text, setText] = useState(String(value));
+  useEffect(() => setText(String(value)), [value]);
+  const commit = () => {
+    const n = Number(text);
+    const max = k === 'ecoThresholdMB' ? 4096 : MAX_OPEN_MB;
+    // eco 기준은 0(자동 해제 끔)도 허용
+    const ok = Number.isFinite(n) && (n > 0 || (k === 'ecoThresholdMB' && n === 0));
+    const v = ok ? Math.min(max, Math.round(n * 10) / 10) : value;
+    set(k as keyof Settings, v as never);
+    setText(String(v));
+  };
+  return (
+    <div className={styles.field} style={{ width: 150 }}>
+      <label className={styles.label}>{label}</label>
+      <input
+        type="number"
+        min={0.1}
+        max={MAX_OPEN_MB}
+        step={1}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => e.key === 'Enter' && commit()}
+      />
+    </div>
+  );
+}
+
+/** 환경설정 > 파일 열기: 로컬/원격 일반·대용량 한도 */
+function FileOpenLimits() {
+  const s = useSettingsStore();
+  const rows: { title: string; normal: LimitKey; large: LimitKey }[] = [
+    { title: '로컬 파일', normal: 'localNormalMB', large: 'localLargeMB' },
+    { title: '원격 파일 (SSH)', normal: 'remoteNormalMB', large: 'remoteLargeMB' },
+  ];
+  return (
+    <>
+      <div className={styles.hint}>
+        <b>일반 파일 한도</b> 이하는 바로 편집기로 엽니다. <b>대용량 파일 한도</b> 이하는 확인 후 편집기로
+        전체를 읽거나 보기 모드로 일부만 읽을 수 있고, 그보다 크면 보기 모드로만 엽니다.
+        보기 모드는 파일 전체를 메모리에 올리지 않습니다. 바이너리 파일은 크기와 관계없이 Hex 보기를 묻습니다.
+      </div>
+      {rows.map((r) => (
+        <div key={r.title}>
+          <div className={styles.sectionTitle}>{r.title}</div>
+          <div className={styles.row}>
+            <MbInput k={r.normal} label="일반 파일 한도 (MB)" />
+            <MbInput k={r.large} label="대용량 파일 한도 (MB)" />
+          </div>
+          {s[r.normal] > s[r.large] && (
+            <div className={styles.error}>일반 파일 한도가 대용량 파일 한도보다 큽니다. 대용량 한도가 함께 적용됩니다.</div>
+          )}
+        </div>
+      ))}
+      <div className={styles.hint}>최대 {MAX_OPEN_MB}MB까지 지정할 수 있습니다.</div>
+
+      <div className={styles.sectionTitle}>eco (메모리 절약)</div>
+      <div className={styles.row}>
+        <MbInput k="ecoThresholdMB" label="자동 해제 기준 (MB)" />
+      </div>
+      <div className={styles.hint}>
+        열린 탭 내용의 합계가 이 값을 넘으면, 화면에 보이지 않고 저장할 변경이 없는 탭부터 오래 안 본 순서로
+        메모리에서 해제합니다(탭에 eco 아이콘 표시). 탭을 다시 선택하면 파일에서 새로 읽으며, 이때 실행 취소 기록은
+        사라집니다. 0이면 자동 해제를 끕니다. 탭 바의 eco 버튼으로 언제든 바로 해제할 수 있습니다.
+      </div>
+    </>
+  );
+}
+
+/** Windows 탐색기 우클릭 메뉴(보관/보관 해제) 토글 — 상태는 레지스트리 기준 */
+function ExplorerMenuToggle() {
+  const [on, setOn] = useState<boolean | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    explorerMenuStatus().then(setOn).catch((e) => setError(String(e)));
+  }, []);
+  const toggle = async (enabled: boolean) => {
+    setError('');
+    try {
+      await explorerMenuSet(enabled);
+      setOn(await explorerMenuStatus());
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+  return (
+    <>
+      <label className={styles.assocGroupHead}>
+        <input
+          type="checkbox"
+          checked={!!on}
+          disabled={on === null}
+          onChange={(e) => void toggle(e.target.checked)}
+        />
+        <span>Windows 탐색기 우클릭 메뉴에 "보관/해제" 표시</span>
+      </label>
+      <div className={styles.hint}>
+        Windows 11에서는 "더 많은 옵션 표시"(Shift+F10) 메뉴에 나타납니다.
+      </div>
+      {error && <div className={styles.error}>{error}</div>}
+    </>
+  );
 }
 
 export default function SettingsDialog({ open, onClose }: Props) {
@@ -392,6 +507,49 @@ export default function SettingsDialog({ open, onClose }: Props) {
               </div>
               </>
             )}
+
+            {tab === 'features' && (
+              <>
+                <div className={styles.sectionTitle}>로컬 파일 암복호화</div>
+                <label className={styles.assocGroupHead}>
+                  <input
+                    type="checkbox"
+                    checked={s.localCryptoEnabled}
+                    onChange={(e) => {
+                      s.set('localCryptoEnabled', e.target.checked);
+                      // 기능을 끄면 탐색기 메뉴도 함께 제거
+                      if (!e.target.checked && isFileAssocPlatform()) void explorerMenuSet(false).catch(() => {});
+                    }}
+                  />
+                  <span>로컬에서 암복호화 기능 사용하기</span>
+                </label>
+                <div className={styles.hint}>
+                  로컬 파일 트리에서 파일·폴더를 우클릭 → "보관/해제"로 처리합니다. 대상이 모두 보관된
+                  파일이면 해제(복호화), 아니면 보관(암호화)합니다
+                  (Ctrl/Cmd+클릭으로 여러 개 선택 · 한 번에 4개까지 · 루트·시스템 폴더 불가)
+                  (ChaCha20, 비밀번호 기반). 파일 헤더에는 식별용 매직 값만 기록하고
+                  알고리즘 정보는 기록하지 않습니다.
+                </div>
+                {s.localCryptoEnabled && (
+                  <div className={styles.field}>
+                    <label className={styles.label}>보관 파일 확장자</label>
+                    <input
+                      value={s.localCryptoExtension}
+                      onChange={(e) => s.set('localCryptoExtension', e.target.value)}
+                      placeholder="비워 두면 확장자 변경 없음"
+                      style={{ width: 200 }}
+                    />
+                    <div className={styles.hint}>
+                      보관 시 파일명 뒤에 붙이고(예: a.txt → a.txt.data), 보관 해제 시 제거합니다.
+                      비워 두면 원본 파일을 제자리에서 교체합니다.
+                    </div>
+                  </div>
+                )}
+                {s.localCryptoEnabled && isFileAssocPlatform() && <ExplorerMenuToggle />}
+              </>
+            )}
+
+            {tab === 'fileOpen' && <FileOpenLimits />}
 
             {tab === 'fileAssoc' && <FileAssocPanel />}
 

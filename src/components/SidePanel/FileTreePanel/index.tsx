@@ -11,6 +11,7 @@ import {
   Folder,
   FolderOpen,
   FolderPlus,
+  Binary,
   Download,
   FileArchive,
   Folders,
@@ -819,6 +820,14 @@ function FileTreeItem({
           {entry.isDir && (
             <ContextMenu.Item className={styles.contextItem} onSelect={onRefresh}>
               <RefreshCw size={12} /> 새로 고침
+            </ContextMenu.Item>
+          )}
+          {!entry.isDir && (
+            <ContextMenu.Item
+              className={styles.contextItem}
+              onSelect={() => useEditorStore.getState().openHex(connectionId, entry)}
+            >
+              <Binary size={12} /> Hex 보기로 열기
             </ContextMenu.Item>
           )}
           <ContextMenu.Separator className={styles.separator} />

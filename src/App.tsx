@@ -52,6 +52,8 @@ import { useLocalWorkspaceStore } from './stores/localWorkspaceStore';
 import { toastError } from './stores/toastStore';
 import type { PingInfo } from './types';
 import styles from './App.module.css';
+import TextStatsStatus from './components/TextStatsStatus';
+import EncodingStatus from './components/EncodingStatus';
 
 /** 현재 선택된 세션의 파일 트리를 서버 기준으로 새로고침 (열려있던 경로만) */
 function refreshVisibleFileTree() {
@@ -464,8 +466,10 @@ export default function App() {
             v{version}
           </button>
           <TransferStatus />
+          <TextStatsStatus />
 
           <div className={styles.statusRight}>
+            <EncodingStatus />
             <WordWrapStatus />
             <IndentStatus />
             <LanguageStatus />

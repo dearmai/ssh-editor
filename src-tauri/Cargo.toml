@@ -1,6 +1,6 @@
 [package]
 name = "ssh-editor"
-version = "0.1.1"
+version = "0.2.0"
 description = "SSH Remote File Editor"
 authors = ["rinjae"]
 edition = "2021"
@@ -41,7 +41,12 @@ tokio-native-tls = { version = "0.3" }
 log          = { version = "0.4" }
 async-trait  = { version = "0.1" }
 regex        = { version = "1" }
+memchr       = { version = "2" }
+encoding_rs  = "0.8"
 once_cell    = { version = "1" }
+# 로컬 파일 암복호화
+chacha20poly1305 = "0.10"
+argon2       = "0.5"
 tauri-plugin-clipboard-manager = "2"
 arboard = "3.6.1"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp"] }
@@ -58,3 +63,7 @@ webkit2gtk = { version = "2", features = ["v2_20"] }
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"
 windows-sys = { version = "0.61", features = ["Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_Foundation"] }
+
+[dev-dependencies]
+# 보관 매직 바이트 검증 테스트용
+sha2 = "0.10"

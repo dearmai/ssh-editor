@@ -11,7 +11,8 @@
 #                        Win: NSIS/MSI 무인 설치
 #                        mac: .app 빌드 후 /Applications 에 설치
 #    make dev          개발 모드 실행
-#    make build        배포 빌드 (설치파일/번들만 생성)
+#    make build        배포 빌드 (Win: build/windows/ 설치판 / mac·Linux: build/release/)
+#    make portable     무설치(포터블) 실행파일 빌드 → build/windows-portable/ (Windows 전용)
 #    make signed       코드사인 배포 빌드 (Windows 전용, 설치판+포터블)
 #    make setup        make install 별칭 (하위호환)
 #    make verify       타입 검증 (tsc + cargo check)
@@ -38,7 +39,7 @@ else
 endif
 
 .DEFAULT_GOAL := help
-.PHONY: help env-check env-setup setup install deps dev build signed native verify frontend rust clean
+.PHONY: help env-check env-setup setup install deps dev build portable signed native verify frontend rust clean
 
 # ============================================================================
 #  Windows
@@ -66,8 +67,13 @@ setup: install
 dev:
 	npm run tauri:dev
 
+# 설치판: build/windows/ (NSIS *-setup.exe, *.msi)
 build:
-	npm run tauri:build
+	@$(PS) scripts/build-installer.ps1
+
+# 무설치판: build/windows-portable/ssh-editor.exe (설정·WebView2 데이터는 옆 data/ 폴더)
+portable:
+	npm run tauri:portable
 
 # 셀프 인증서로 서명한 설치판(NSIS)+포터블 빌드 (처음 한 번 scripts/codesign-cert.ps1 필요)
 signed:
@@ -120,6 +126,9 @@ verify:
 		cd src-tauri && cargo check --locked; \
 	fi
 
+portable:
+	@echo "make portable 은 Windows 전용입니다." && exit 1
+
 signed:
 	@echo "make signed 는 Windows 전용입니다." && exit 1
 
@@ -141,6 +150,7 @@ help:
 	@echo "  make install     빌드 후 설치 (mac: /Applications, Linux: ~/.local)"
 	@echo "  make dev         개발 모드 실행"
 	@echo "  make build       배포 빌드 (설치파일/번들 생성)"
+	@echo "  make portable    무설치(포터블) 실행파일 빌드 (Windows 전용)"
 	@echo "  make signed      코드사인 배포 빌드 (Windows 전용)"
 	@echo "  make setup       make install 별칭 (하위호환)"
 	@echo "  make verify      타입 검증 (tsc + cargo check)"

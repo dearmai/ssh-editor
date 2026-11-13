@@ -88,13 +88,23 @@ export interface TransferProgressEvent {
 }
 
 export interface EditorTab {
+  /** 실제 읽기·저장에 사용하는 인코딩 (BOM 포함 여부도 보존) */
+  encoding?: string;
   id: string; // `${connectionId}:${remotePath}`
   connectionId: string;
   remotePath: string;
   fileName: string;
   content: string;
-  /** 큰 텍스트 파일은 서버에서 일부씩 읽는 보기 탭 */
+  /** 편집 불가 보기 탭 (대용량·바이너리) */
   viewMode?: boolean;
+  /** 보기 탭 종류: log=원격 tail 보기, paged=로컬 구간 보기, hex=Hex 보기 (생략 시 log) */
+  viewer?: 'log' | 'paged' | 'hex';
+  /** eco: 내용을 메모리에서 해제한 상태 — 다시 보이면 파일에서 새로 읽는다 */
+  unloaded?: boolean;
+  /** 마지막으로 화면에 보인 시각 (eco 해제 순서) */
+  lastActive?: number;
+  /** 대용량 파일의 일부 구간만 편집하는 탭 — 저장 시 원본의 [start, end) 를 바꿔 끼운다 */
+  segment?: { start: number; end: number; startLine: number; size: number; mtime?: number };
   isDirty: boolean;
   /** 편집하거나 명시적으로 유지하기 전에는 다른 파일을 열 때 교체되는 임시 탭 */
   isPreview?: boolean;

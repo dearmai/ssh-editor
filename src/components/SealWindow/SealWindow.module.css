@@ -1,0 +1,94 @@
+.window {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.files {
+  list-style: none;
+  margin: 0;
+  padding: 6px 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 12px;
+}
+.files li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  min-width: 0;
+}
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reason {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.ok { color: var(--accent); flex-shrink: 0; }
+.fail { color: var(--error, #f48771); flex-shrink: 0; }
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.muted {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.error {
+  font-size: 12px;
+  color: var(--error, #f48771);
+  overflow-wrap: anywhere;
+}
+
+.buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+}
+.buttons button {
+  padding: 6px 16px;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+}
+.buttons button:disabled { opacity: 0.5; cursor: default; }
+.cancel { background: transparent; color: var(--text-primary); }
+.cancel:hover:not(:disabled) { background: var(--bg-hover); }
+.primary { background: var(--accent); border-color: var(--accent) !important; color: white; }

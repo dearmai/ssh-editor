@@ -96,10 +96,13 @@ pub async fn sftp_list_dir(
 pub async fn sftp_read_file(
     session_id: String,
     path: String,
+    limit: Option<u64>,
     pool: State<'_, SshConnectionPool>,
 ) -> AppResult<String> {
     let session = pool.get(&session_id)?;
-    sftp::read_file(&session, &path).await
+    // limit: 앱 설정의 원격 대용량 파일 한도 (생략 시 10MB)
+    let limit = limit.map_or(10 * 1024 * 1024, |l| crate::file_view::clamp_limit(Some(l)));
+    sftp::read_file_limited(&session, &path, limit).await
 }
 
 #[tauri::command]

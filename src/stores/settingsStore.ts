@@ -70,6 +70,17 @@ export interface Settings {
   indentDefault: IndentRule;
   /** 확장자(소문자, 점 없음) 또는 특수 파일명 → 들여쓰기 규칙 */
   indentByExt: Record<string, IndentRule>;
+  /** 로컬 파일 암복호화 기능 사용 여부 */
+  localCryptoEnabled: boolean;
+  /** 암호화 시 붙이고 복호화 시 떼는 확장자 (빈 값이면 확장자 변경 없이 제자리 교체) */
+  localCryptoExtension: string;
+  /** 파일 열기 용량 한도 (MB) — 일반: 확인 없이 편집기로, 대용량: 확인 후 편집기로 전체 로딩 가능, 초과: 보기 모드만 */
+  localNormalMB: number;
+  localLargeMB: number;
+  remoteNormalMB: number;
+  remoteLargeMB: number;
+  /** eco: 열린 탭 내용 합계가 이 값(MB)을 넘으면 안 보이는 탭을 메모리에서 해제 (0 = 자동 해제 끔) */
+  ecoThresholdMB: number;
 }
 
 interface SettingsStore extends Settings {
@@ -111,7 +122,17 @@ const DEFAULTS: Settings = {
   terminalListCollapsed: false,
   indentDefault: DEFAULT_INDENT,
   indentByExt: DEFAULT_INDENT_BY_EXT,
+  localCryptoEnabled: false,
+  localCryptoExtension: '.data',
+  localNormalMB: 50,
+  localLargeMB: 100,
+  remoteNormalMB: 1,
+  remoteLargeMB: 10,
+  ecoThresholdMB: 200,
 };
+
+/** 편집기로 전체를 읽을 수 있는 최대 크기 (Rust file_view::MAX_OPEN_LIMIT 과 같게) */
+export const MAX_OPEN_MB = 512;
 
 export const useSettingsStore = create<SettingsStore>()(
   persist(
@@ -142,7 +163,7 @@ export const useSettingsStore = create<SettingsStore>()(
     }),
     {
       name: 'ssh-editor-settings',
-      version: 2,
+      version: 3,
       // v0 저장본에는 terminalPosition(및 구 panelPosition/panelWidth)이 남아 있어
       // 새 창이 우측 도킹으로 복원되므로 제거한다.
       // v1 → v2: 폰트를 번들 Pretendard/D2Coding으로 교체. 사용자가 직접 바꾼 값은
@@ -161,6 +182,8 @@ export const useSettingsStore = create<SettingsStore>()(
           const cur = st[key];
           if (typeof cur === 'string' && legacy.includes(cur)) st[key] = next;
         }
+        // v2 → v3: 로컬 일반 파일 한도 기본값 10MB → 50MB (직접 바꾼 값은 유지)
+        if (st.localNormalMB === 10) st.localNormalMB = 50;
         return st as unknown as Settings;
       },
       // resolvedTheme·draggingPanel은 런타임 값, terminalPosition은 새 창에서 항상
@@ -244,4 +267,15 @@ export function applyTheme(resolved: ResolvedTheme) {
 /** 확장자 규칙 + 전역 기본값으로 해석한 파일의 들여쓰기 (파일별 오버라이드는 indentStore에서 우선 적용) */
 export function indentForPath(filePath: string, settings: Settings): IndentRule {
   return settings.indentByExt[indentKeyFor(filePath)] ?? settings.indentDefault ?? DEFAULT_INDENT;
+}
+
+// ── 파일 열기 용량 한도 ────────────────────────────
+/** 연결(로컬/원격)별 파일 열기 한도 (바이트) */
+export function openLimits(connectionId: string): { normal: number; large: number } {
+  const s = useSettingsStore.getState();
+  const local = connectionId === 'local';
+  const MB = 1024 * 1024;
+  const large = Math.min(MAX_OPEN_MB, Math.max(1, local ? s.localLargeMB : s.remoteLargeMB));
+  const normal = Math.min(large, Math.max(0.1, local ? s.localNormalMB : s.remoteNormalMB));
+  return { normal: normal * MB, large: large * MB };
 }

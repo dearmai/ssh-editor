@@ -6,12 +6,16 @@ import { useSettingsStore } from '../../../stores/settingsStore';
 import { defineMonacoThemes, getTheme, monacoThemeName } from '../../../themes';
 import { registerCaddyLanguage } from '../../../utils/caddyLang';
 import styles from './MonacoPane.module.css';
+import { useTextStatsStore } from '../../../stores/textStatsStore';
+import { addStats, textStats, TextStatsIndex } from '../../../utils/textStats';
+import { encodedLengths } from '../../../ipc/commands';
 
 interface Props {
   tabId: string;
+  groupId: string;
 }
 
-export default function MonacoPane({ tabId }: Props) {
+export default function MonacoPane({ tabId, groupId }: Props) {
   const updateContent = useEditorStore((s) => s.updateContent);
   const saveTab = useEditorStore((s) => s.saveTab);
   const checkExternalChange = useEditorStore((s) => s.checkExternalChange);
@@ -38,6 +42,10 @@ export default function MonacoPane({ tabId }: Props) {
   // remeasureFonts는 런타임엔 있으나 일부 monaco 타입 정의에 누락 → 느슨하게 처리
   type Remeasurable = { remeasureFonts?: () => void };
   const editorRef = useRef<Remeasurable | null>(null);
+  const cleanupStats = useRef<(() => void) | null>(null);
+  const refreshStats = useRef<(() => void) | null>(null);
+  useEffect(() => () => cleanupStats.current?.(), []);
+  useEffect(() => { refreshStats.current?.(); }, [tab?.encoding]);
 
   const handleSave = useCallback(async () => {
     await saveTab(tabId);
@@ -75,6 +83,111 @@ export default function MonacoPane({ tabId }: Props) {
           registerCaddyLanguage(monaco);
         }}
         onMount={(editor) => {
+          const model = editor.getModel();
+          if (model) {
+            let lineTexts = model.getLinesContent();
+            let index = new TextStatsIndex(lineTexts);
+            let previousVersion = model.getVersionId();
+            let timer: ReturnType<typeof setTimeout> | undefined;
+            let byteTimer: ReturnType<typeof setTimeout> | undefined;
+            let sequence = 0;
+            let disposed = false;
+            let cachedBytes: { version: number; encoding: string; value: Promise<number | null> } | undefined;
+            const publish = () => {
+              const position = editor.getPosition();
+              if (!position || model.isDisposed()) return;
+              const lineNumber = Math.min(position.lineNumber, model.getLineCount());
+              const ranges = (editor.getSelections() ?? []).filter((range) => !range.isEmpty());
+              const selection = ranges.length ? ranges.reduce(
+                (sum, range) => addStats(sum, textStats(model.getValueInRange(range))),
+                { characters: 0, bytes: 0, words: 0 },
+              ) : null;
+              const encoding = useEditorStore.getState().tabsById[tabId]?.encoding ?? 'utf-8';
+              const utf8 = encoding.startsWith('utf-8');
+              const snapshot = {
+                tabId, file: index.total(model.getEOL()),
+                line: index.lines[lineNumber - 1] ?? textStats(''),
+                lineNumber: lineNumber + (useEditorStore.getState().tabsById[tabId]?.segment?.startLine ?? 0),
+                selection,
+              };
+              if (encoding === 'utf-8-bom') snapshot.file = { ...snapshot.file, bytes: snapshot.file.bytes + 3 };
+              useTextStatsStore.getState().update(groupId, { ...snapshot,
+                byteCounts: utf8 ? undefined : { file: null, line: null, selection: null },
+              });
+              clearTimeout(byteTimer);
+              const request = ++sequence;
+              if (!utf8) byteTimer = setTimeout(async () => {
+                if (disposed || model.isDisposed()) return;
+                const version = model.getVersionId();
+                if (!cachedBytes || cachedBytes.version !== version || cachedBytes.encoding !== encoding) {
+                  cachedBytes = { version, encoding,
+                    value: encodedLengths([model.getValue()], encoding).then(([n]) => n + (encoding.startsWith('utf-16') ? 2 : 0)).catch(() => null) };
+                }
+                const file = cachedBytes.value;
+                const line = model.getLineContent(lineNumber);
+                const selected = ranges.map((range) => model.getValueInRange(range));
+                const [fileBytes, parts] = await Promise.all([
+                  file,
+                  encodedLengths([line, ...selected], encoding).catch(() => null),
+                ]);
+                if (disposed || request !== sequence || version !== model.getVersionId()) return;
+                useTextStatsStore.getState().update(groupId, { ...snapshot, byteCounts: {
+                  file: fileBytes, line: parts?.[0] ?? null,
+                  selection: parts ? parts.slice(1).reduce((a, b) => a + b, 0) : null,
+                } });
+              }, 180);
+            };
+            const cursor = editor.onDidChangeCursorSelection(() => {
+              clearTimeout(timer);
+              timer = setTimeout(publish, 60);
+            });
+            const change = model.onDidChangeContent((event) => {
+              if (event.isFlush || event.isEolChange) {
+                lineTexts = model.getLinesContent();
+                index = new TextStatsIndex(lineTexts);
+                cachedBytes = undefined;
+              }
+              else if (event.changes.length) {
+                const first = Math.min(...event.changes.map((c) => c.range.startLineNumber));
+                const last = Math.max(...event.changes.map((c) => c.range.endLineNumber));
+                const delta = model.getLineCount() - index.lines.length;
+                const lines: string[] = [];
+                for (let n = first; n <= last + delta; n++) lines.push(model.getLineContent(n));
+                const encoding = useEditorStore.getState().tabsById[tabId]?.encoding ?? 'utf-8';
+                if (cachedBytes?.version === previousVersion && cachedBytes.encoding === encoding) {
+                  const oldText = lineTexts.slice(first - 1, last).join(model.getEOL());
+                  const newText = lines.join(model.getEOL());
+                  const previous = cachedBytes.value;
+                  // UTF-8 외 인코딩도 편집한 줄의 바이트 차이만 반영한다.
+                  const fallback = model.createSnapshot();
+                  cachedBytes = { version: model.getVersionId(), encoding, value: previous.then(async (bytes) => {
+                    if (bytes == null) {
+                      const chunks: string[] = [];
+                      for (let chunk = fallback.read(); chunk !== null; chunk = fallback.read()) chunks.push(chunk);
+                      const [size] = await encodedLengths([chunks.join('')], encoding);
+                      return size + (encoding.startsWith('utf-16') ? 2 : 0);
+                    }
+                    const [before, after] = await encodedLengths([oldText, newText], encoding);
+                    return bytes + after - before;
+                  }).catch(() => null) };
+                }
+                lineTexts = lineTexts.slice(0, first - 1).concat(lines, lineTexts.slice(last));
+                index.replace(first - 1, last - first + 1, lines);
+              }
+              previousVersion = model.getVersionId();
+              publish();
+            });
+            cleanupStats.current = () => {
+              clearTimeout(timer);
+              clearTimeout(byteTimer);
+              disposed = true;
+              refreshStats.current = null;
+              cursor.dispose(); change.dispose();
+              useTextStatsStore.getState().remove(groupId);
+            };
+            refreshStats.current = publish;
+            publish();
+          }
           const e = editor as unknown as Remeasurable;
           editorRef.current = e;
           // 폰트가 실제 로드된 뒤 다시 측정 → 터미널(xterm)과 동일 폰트로 렌더
@@ -93,7 +206,8 @@ export default function MonacoPane({ tabId }: Props) {
           fontFamily: editorFontFamily,
           // 0~8 값은 Monaco가 글꼴 크기의 배수로 해석
           lineHeight: editorLineHeight,
-          lineNumbers: 'on',
+          // 구간 편집 탭은 원본 파일 기준 줄 번호로 표시
+          lineNumbers: tab.segment ? (n: number) => String(n + tab.segment!.startLine) : 'on',
           // 복사 시 문법 강조(색상) HTML을 함께 담지 않고 순수 텍스트만 클립보드에 넣는다
           copyWithSyntaxHighlighting: false,
           // 탭 드래그를 .pane이 받도록 Monaco 자체 드롭/드래그 처리 비활성화

@@ -5,6 +5,9 @@ import EditorTabs from './EditorTabs';
 import MarkdownPreview from './MarkdownPreview';
 import MonacoPane from './MonacoPane';
 import LogViewer from './LogViewer';
+import LargeFileViewer from './LargeFileViewer';
+import HexViewer from './HexViewer';
+import UnloadedPane from './UnloadedPane';
 import WelcomeScreen from './WelcomeScreen';
 import styles from './EditorArea.module.css';
 
@@ -82,12 +85,20 @@ function GroupView({ groupId }: { groupId: string }) {
       {isActiveGroup && groupCount > 1 && <div className={styles.activeStrip} />}
       <EditorTabs group={group} groupCount={groupCount} />
       {group.activeTabId ? (
-        activeTab?.viewMode ? (
-          <LogViewer key={`${groupId}:${group.activeTabId}`} tabId={group.activeTabId} />
+        activeTab?.unloaded ? (
+          <UnloadedPane key={`${groupId}:${group.activeTabId}:unloaded`} tabId={group.activeTabId} />
+        ) : activeTab?.viewMode ? (
+          activeTab.viewer === 'hex' ? (
+            <HexViewer key={`${groupId}:${group.activeTabId}:hex`} tabId={group.activeTabId} />
+          ) : activeTab.viewer === 'paged' ? (
+            <LargeFileViewer key={`${groupId}:${group.activeTabId}:paged`} tabId={group.activeTabId} />
+          ) : (
+            <LogViewer key={`${groupId}:${group.activeTabId}`} tabId={group.activeTabId} />
+          )
         ) : activeTab?.language === 'markdown' && activeTab.previewMode ? (
           <MarkdownPreview key={`${groupId}:${group.activeTabId}:preview`} tabId={group.activeTabId} />
         ) : (
-          <MonacoPane key={`${groupId}:${group.activeTabId}`} tabId={group.activeTabId} />
+          <MonacoPane key={`${groupId}:${group.activeTabId}`} tabId={group.activeTabId} groupId={groupId} />
         )
       ) : groupCount > 1 ? (
         <div className={styles.emptyPane}>

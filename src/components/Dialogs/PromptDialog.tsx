@@ -1,6 +1,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { usePromptStore } from '../../stores/promptStore';
+import PasswordInput from './PasswordInput';
 import styles from './Dialog.module.css';
 
 export default function PromptDialog() {
@@ -21,8 +22,19 @@ export default function PromptDialog() {
   }, [current]);
 
   const submit = () => {
-    const v = value.trim();
+    // 비밀번호는 공백도 의미가 있으므로 그대로 전달
+    const v = current?.password ? value : value.trim();
     if (v) respond(v);
+  };
+
+  const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submit();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      respond(null);
+    }
   };
 
   return (
@@ -36,29 +48,33 @@ export default function PromptDialog() {
 
           <div className={styles.form}>
             <div className={styles.field}>
-              <input
-                ref={inputRef}
-                value={value}
-                placeholder={current?.placeholder}
-                onChange={(e) => setValue(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    submit();
-                  } else if (e.key === 'Escape') {
-                    e.preventDefault();
-                    respond(null);
-                  }
-                }}
-                autoFocus
-              />
+              {current?.password ? (
+                <PasswordInput
+                  value={value}
+                  placeholder={current.placeholder}
+                  onChange={(e) => setValue(e.target.value)}
+                  onKeyDown={onKeyDown}
+                  autoComplete="off"
+                  autoFocus
+                />
+              ) : (
+                <input
+                  ref={inputRef}
+                  value={value}
+                  placeholder={current?.placeholder}
+                  onChange={(e) => setValue(e.target.value)}
+                  onKeyDown={onKeyDown}
+                  autoFocus
+                />
+              )}
+              {current?.hint && <div className={styles.hint}>{current.hint}</div>}
             </div>
 
             <div className={styles.buttons}>
               <button className={styles.cancelBtn} onClick={() => respond(null)}>
                 {current?.cancelLabel ?? '취소'}
               </button>
-              <button className={styles.submitBtn} onClick={submit} disabled={!value.trim()}>
+              <button className={styles.submitBtn} onClick={submit} disabled={current?.password ? !value : !value.trim()}>
                 {current?.confirmLabel ?? '확인'}
               </button>
             </div>

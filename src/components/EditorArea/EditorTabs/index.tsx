@@ -3,6 +3,7 @@ import {
   Code2,
   Copy,
   Eye,
+  Leaf,
   Map as MapIcon,
   Save,
   SplitSquareHorizontal,
@@ -13,9 +14,16 @@ import * as ContextMenu from '@radix-ui/react-context-menu';
 import { useEditorStore, type EditorGroup } from '../../../stores/editorStore';
 import { useSettingsStore } from '../../../stores/settingsStore';
 import { computeTabLabels } from '../../../utils/tabLabels';
+import { log } from '../../../stores/logStore';
 import styles from './EditorTabs.module.css';
 
 export default function EditorTabs({ group, groupCount }: { group: EditorGroup; groupCount: number }) {
+  const [ecoNote, setEcoNote] = useState('');
+  useEffect(() => {
+    if (!ecoNote) return;
+    const t = window.setTimeout(() => setEcoNote(''), 2500);
+    return () => window.clearTimeout(t);
+  }, [ecoNote]);
   const tabsById = useEditorStore((s) => s.tabsById);
   // 모든 열린 탭을 대상으로 라벨 계산 (그룹이 달라도 동일 파일명이면 상위 경로로 구분)
   const labels = useMemo(() => computeTabLabels(Object.values(tabsById)), [tabsById]);
@@ -79,6 +87,18 @@ export default function EditorTabs({ group, groupCount }: { group: EditorGroup; 
         />
         {groupCount > 1 && (
           <div className={styles.actions}>
+        <button
+          className={styles.actionBtn}
+          onClick={() => {
+            const { count, bytes } = useEditorStore.getState().freeMemory(true);
+            if (count === 0) log.info('eco: 해제할 탭이 없습니다 (보이는 탭·저장 안 된 탭은 제외)');
+            else setEcoNote(`${count}개 탭 · ${(bytes / 1024 / 1024).toFixed(1)} MB 해제`);
+          }}
+          title="eco: 보이지 않는 탭의 메모리 해제 (저장 안 된 탭 제외)"
+        >
+          <Leaf size={15} />
+        </button>
+        {ecoNote && <span className={styles.ecoNote}>{ecoNote}</span>}
             <button
               className={styles.actionBtn}
               onClick={() => closeGroup(group.id)}
@@ -149,9 +169,11 @@ export default function EditorTabs({ group, groupCount }: { group: EditorGroup; 
                   onDrop={performDrop}
                   onClick={() => setActiveTab(group.id, id)}
                   onDoubleClick={() => keepTab(id)}
-                  title={`${tab.remotePath}${tab.isPreview ? '\n임시 탭 · 더블클릭하여 유지' : ''}`}
+                  title={`${tab.remotePath}${tab.isPreview ? '\n임시 탭 · 더블클릭하여 유지' : ''}${
+                    tab.unloaded ? '\neco: 메모리에서 해제됨 · 선택하면 다시 읽음' : ''}`}
                 >
                   {tab.isDirty && <span className={styles.dirty} title="저장되지 않은 변경사항" />}
+                  {tab.unloaded && <Leaf size={12} className={styles.eco} aria-label="메모리에서 해제됨" />}
                   <span className={`${styles.name} ${tab.isPreview ? styles.preview : ''}`}>{tab.fileName}</span>
                   {labels[id]?.hint && (
                     <span className={styles.dirHint} title={tab.remotePath}>

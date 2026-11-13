@@ -8,6 +8,10 @@ export interface PromptOptions {
   defaultValue?: string;
   confirmLabel?: string;
   cancelLabel?: string;
+  /** 비밀번호 입력 (가림 처리, 앞뒤 공백 유지) */
+  password?: boolean;
+  /** 입력창 아래 안내 문구 */
+  hint?: string;
 }
 
 interface PromptState {

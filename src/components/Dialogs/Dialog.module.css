@@ -440,8 +440,31 @@
 
 /* ── 환경설정: 탭 UI ────────────────────────────── */
 /* 설정 항목이 많아 탭으로 나눈다. 폭도 일반 다이얼로그보다 넓게 */
+/* 환경설정: 상단 고정(탭을 바꿔도 위치가 흔들리지 않게) + 높이 고정, 내용은 스크롤 */
 .settingsContent {
   width: 640px;
+  top: 48px;
+  transform: translateX(-50%);
+  height: min(560px, calc(100vh - 96px));
+  animation: slideInTop 0.15s ease;
+}
+.settingsContent .form {
+  flex: 1;
+  min-height: 0;
+}
+/* 하단 버튼은 내용 길이와 관계없이 창 아래쪽에 붙어 있게 */
+.settingsContent .form > .buttons {
+  margin-top: auto;
+  position: sticky;
+  bottom: -16px;
+  margin-bottom: -16px;
+  padding: 10px 0 16px;
+  background: var(--bg-secondary);
+}
+
+@keyframes slideInTop {
+  from { opacity: 0; transform: translate(-50%, -8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
 }
 
 .tabBar {

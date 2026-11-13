@@ -109,7 +109,7 @@ pub async fn probe(session: &SshSession, path: &str) -> AppResult<ProbeResult> {
         let tool = *session.stat_tool.lock().await;
         let size = shell_fs::stat(session, tool, path).await?.size;
         let head = shell_fs::read_head(session, path, 8192).await?;
-        return Ok(ProbeResult { size, is_binary: head.contains(&0) });
+        return Ok(ProbeResult { size, is_binary: head.contains(&0) && !crate::text_encoding::has_utf16_bom(&head) });
     };
 
     let meta = sftp.metadata(path).await?;
@@ -118,7 +118,7 @@ pub async fn probe(session: &SshSession, path: &str) -> AppResult<ProbeResult> {
     let mut file = sftp.open(path).await?;
     let mut buf = vec![0u8; 8192];
     let n = file.read(&mut buf).await.unwrap_or(0);
-    let is_binary = buf[..n].contains(&0);
+    let is_binary = buf[..n].contains(&0) && !crate::text_encoding::has_utf16_bom(&buf[..n]);
 
     Ok(ProbeResult { size, is_binary })
 }

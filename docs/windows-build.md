@@ -100,16 +100,18 @@ npx tauri dev
 
 ```powershell
 make build
-# = npm run tauri:build
+# = scripts/build-installer.ps1 (npm run tauri:build 후 설치파일을 build\windows\ 로 복사)
 ```
 
 `tauri.conf.json`의 `bundle.targets: "all"` 이므로 Windows에서는 **NSIS + MSI** 두 가지가 생성됩니다.
 
 | 산출물 | 경로 |
 |--------|------|
-| 실행 파일 | `src-tauri\target\release\ssh-editor.exe` |
-| NSIS 설치 마법사 | `src-tauri\target\release\bundle\nsis\*-setup.exe` |
-| MSI 패키지 | `src-tauri\target\release\bundle\msi\*.msi` |
+| NSIS 설치 마법사 | `build\windows\*-setup.exe` |
+| MSI 패키지 | `build\windows\*.msi` |
+| 포터블 (`make portable`) | `build\windows-portable\ssh-editor.exe` |
+
+중간 산출물(`src-tauri\target\...`)은 cargo/tauri 캐시이므로 그대로 둡니다.
 
 ## 6. 설치
 
@@ -166,7 +168,7 @@ make install     # = make setup (별칭)
 powershell -ExecutionPolicy Bypass -File scripts/install-app.ps1
 ```
 
-`install-app.ps1`은 `npm run tauri:build` 후 **NSIS `*-setup.exe` 우선**, 없으면 MSI를 찾아
+`install-app.ps1`은 `build-installer.ps1`로 빌드한 뒤 `build\windows\`에서 **NSIS `*-setup.exe` 우선**, 없으면 MSI를 찾아
 설치 화면 없이 무인 설치합니다(NSIS `/S`, MSI `/qn /norestart`).
 설치 종료 코드를 확인하며 실패하면 `make install`도 실패합니다.
 MSI가 재시작 필요 코드(3010)를 반환하면 안내만 표시하고 자동 재시작하지 않습니다.
@@ -189,7 +191,7 @@ npm run icons    # src-tauri/icons/icon.svg → icns/ico/png
 
 `npm run native` / `native:debug` / `native:release` / `native:run` / `native:bundle` 은
 **macOS 전용**입니다. `scripts/native.sh`가 bash + `codesign` + `.app` 래핑을 하기 때문입니다.
-Windows에서는 `npm run tauri:build`(= `make build`)를 쓰세요.
+Windows에서는 `make build`(설치판) 또는 `make portable`(무설치판)을 쓰세요.
 `Makefile`의 Windows 분기는 이미 `dev`/`build`/`native`를 tauri 명령으로 매핑해 둡니다.
 
 ### 메뉴

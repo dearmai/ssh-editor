@@ -13,6 +13,7 @@ import type {
   SshConfigHost,
   StartupArgs,
 } from '../types';
+import { openLimits } from '../stores/settingsStore';
 
 // --- SSH 연결 ---
 export const sshConnect = (profile: ConnectionProfile) =>
@@ -60,8 +61,47 @@ export const pathHome = (sessionId: string) => invoke<string>('path_home', { ses
 export const sftpListDir = (sessionId: string, path: string) =>
   invoke<FileEntry[]>('sftp_list_dir', { sessionId, path });
 
-export const sftpReadFile = (sessionId: string, path: string) =>
-  invoke<string>(sessionId === 'local' ? 'local_read_file' : 'sftp_read_file', { sessionId, path });
+/** 텍스트 파일 전체 읽기. limit 생략 시 앱 설정의 대용량 파일 한도(로컬/원격)를 적용 */
+export const readTextFile = (sessionId: string, path: string, encoding?: string, limit = openLimits(sessionId).large) =>
+  invoke<{ text: string; encoding: string }>('text_read_file', { sessionId, path, limit, encoding: encoding ?? null });
+export const sftpReadFile = async (sessionId: string, path: string, limit = openLimits(sessionId).large, encoding?: string) =>
+  (await readTextFile(sessionId, path, encoding, limit)).text;
+/** BOM을 제외한 텍스트 자체의 인코딩 바이트 수 */
+export const encodedLengths = (texts: string[], encoding: string) =>
+  invoke<number[]>('text_encoded_lengths', { texts, encoding });
+
+// --- 대용량·바이너리 보기 (구간 읽기) ---
+export interface TextChunk { text: string; start: number; end: number; size: number }
+export interface BytesChunk { data: string; offset: number; size: number }
+export interface SearchHit { line: number; offset: number; text: string }
+/** 로컬 파일 바이너리 판별 (앞 8KB) */
+export const localProbe = (path: string) => invoke<ProbeResult>('local_probe', { path });
+/** 로컬 텍스트 구간 — 줄 경계에 맞춰 [start, end) 를 돌려준다 */
+export const localReadText = (path: string, offset: number, len: number) =>
+  invoke<TextChunk>('local_read_text', { path, offset, len });
+/** 바이트 구간 (base64) — 로컬/원격 */
+export const readBytes = (sessionId: string, path: string, offset: number, len: number) =>
+  sessionId === 'local'
+    ? invoke<BytesChunk>('local_read_bytes', { path, offset, len })
+    : invoke<BytesChunk>('sftp_read_bytes', { sessionId, path, offset, len });
+// --- 대용량 로컬 텍스트: 줄 색인 · 줄 읽기 · 구간 편집 ---
+export interface LineIndex { size: number; mtime?: number; newlines: number; total: number; every: number; offsets: number[] }
+/** 희소 줄 색인 (every 줄마다 시작 위치). from 을 주면 늘어난 부분만 이어서 센다 */
+export const localLineIndex = (path: string, from?: { offset: number; newlines: number }) =>
+  invoke<LineIndex>('local_line_index', { path, fromOffset: from?.offset ?? null, fromNewlines: from?.newlines ?? null });
+export const localReadLines = (path: string, anchor: number, skip: number, count: number) =>
+  invoke<{ lines: string[]; nextOffset: number; eof: boolean }>('local_read_lines', { path, anchor, skip, count });
+export interface Segment { text: string; start: number; end: number; lines: number; size: number; mtime?: number }
+export const localReadSegment = (path: string, anchor: number, skip: number, count: number, maxBytes: number) =>
+  invoke<Segment>('local_read_segment', { path, anchor, skip, count, maxBytes });
+/** 원본의 [start, end) 를 content 로 바꿔 끼워 저장 (원본이 바뀌었으면 오류) */
+export const localWriteSegment = (path: string, start: number, end: number, content: string, expectSize: number, expectMtime?: number) =>
+  invoke<{ end: number; size: number; mtime?: number }>('local_write_segment', {
+    path, start, end, content, expectSize, expectMtime: expectMtime ?? null,
+  });
+/** 로컬 파일 흘려 읽기 검색 (최대 200줄) */
+export const localSearch = (path: string, query: string, ignoreCase: boolean) =>
+  invoke<{ hits: SearchHit[]; truncated: boolean }>('local_search', { path, query, ignoreCase });
 
 export interface LogChunk { text: string; offset: number; size: number }
 export const sftpLogChunk = (sessionId: string, path: string, offset?: number) =>
@@ -69,8 +109,8 @@ export const sftpLogChunk = (sessionId: string, path: string, offset?: number) =
 export const sftpLogSearch = (sessionId: string, path: string, query: string) =>
   invoke<string>('sftp_log_search', { sessionId, path, query });
 
-export const sftpWriteFile = (sessionId: string, path: string, content: string) =>
-  invoke<FileStat>(sessionId === 'local' ? 'local_write_file' : 'sftp_write_file', { sessionId, path, content });
+export const sftpWriteFile = (sessionId: string, path: string, content: string, encoding = 'utf-8') =>
+  invoke<FileStat>('text_write_file', { sessionId, path, content, encoding });
 
 export const sftpStat = (sessionId: string, path: string) =>
   invoke<FileStat>(sessionId === 'local' ? 'local_stat' : 'sftp_stat', { sessionId, path });
@@ -178,6 +218,23 @@ export const getStartupArgs = () =>
 // --- 로컬 작업 폴더 / 운영체제 파일 연결 ---
 export const takeOpenFiles = () => invoke<string[]>('take_open_files');
 export const localListDir = (path: string) => invoke<FileEntry[]>('local_list_dir', { path });
+// --- 로컬 파일 보관(암호화) / 보관 해제(복호화) ---
+export type CryptoMode = 'encrypt' | 'decrypt';
+/** 선택한 파일·폴더를 처리 대상 파일로 펼침 (루트·시스템 폴더·5개 이상은 오류).
+ *  mode 생략 시 자동: 모두 보관된 파일이면 보관 해제, 아니면 보관 */
+export const localCryptoPlan = (paths: string[], mode?: CryptoMode) =>
+  invoke<{ mode: CryptoMode; files: string[]; skipped: number }>('local_crypto_plan', { paths, mode: mode ?? null });
+/** 대상 파일 일괄 처리 — 파일별 결과(output: 결과 경로, error: 실패 사유) */
+export const localCryptoBatch = (paths: string[], password: string, extension: string, mode: CryptoMode) =>
+  invoke<{ path: string; output: string | null; error: string | null }[]>('local_crypto_batch', {
+    paths, password, extension, mode,
+  });
+/** 탐색기 우클릭 메뉴로 실행된 보관/보관 해제 요청 (한 번만 반환) */
+export const takeCryptoRequest = () =>
+  invoke<{ paths: string[] } | null>('take_crypto_request');
+/** Windows 탐색기 우클릭 메뉴(보관/보관 해제) 등록 여부 */
+export const explorerMenuStatus = () => invoke<boolean>('explorer_menu_status');
+export const explorerMenuSet = (enabled: boolean) => invoke<void>('explorer_menu_set', { enabled });
 
 // --- 운영체제 파일 연결 관리 (Windows) ---
 export interface FileAssocStatus {

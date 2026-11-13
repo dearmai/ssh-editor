@@ -2,8 +2,13 @@ mod commands;
 mod config;
 mod error;
 mod file_assoc;
+mod file_view;
+use file_view::*;
 use file_assoc::{file_assoc_open_defaults, file_assoc_set, file_assoc_status};
+mod local_crypto;
 mod local_files;
+mod text_encoding;
+use local_crypto::*;
 use local_files::*;
 mod ssh;
 mod storage;
@@ -99,6 +104,13 @@ fn start_exit_flow(app: &tauri::AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run(startup_args: Option<StartupArgs>) {
+    // 탐색기에서 여러 항목으로 보관/보관 해제를 실행하면 항목마다 프로세스가 뜬다 —
+    // 요청을 맡은 프로세스 하나만 창을 띄우고 나머지는 여기서 종료한다.
+    let crypto_request = match startup_request(std::env::args().skip(1)) {
+        Startup::Exit => return,
+        Startup::Request(req) => Some(req),
+        Startup::Normal => None,
+    };
     storage::initialize().expect("설정 디렉터리를 준비할 수 없습니다. 실행파일 폴더의 쓰기 권한을 확인하세요.");
     let builder = tauri::Builder::default();
     #[cfg(target_os = "linux")]
@@ -119,10 +131,12 @@ pub fn run(startup_args: Option<StartupArgs>) {
         .manage(PendingFiles(Mutex::new(cli_files(
             std::env::args().skip(1),
         ))))
+        .manage(PendingCrypto(Mutex::new(crypto_request)))
         .manage(ExitVoteState(Mutex::new(None)))
         .manage(MenuWindowState(Mutex::new(None)))
         .setup(|app| {
             file_assoc::startup_maintenance();
+            explorer_menu_maintenance();
             let prefs_item = MenuItemBuilder::with_id("preferences", "환경설정...")
                 .accelerator("CmdOrCtrl+,")
                 .build(app)?;
@@ -245,6 +259,21 @@ pub fn run(startup_args: Option<StartupArgs>) {
                 _ => {}
             });
 
+            // 탐색기 "보관/해제"로 실행된 경우: 메인 창을 작은 단독 대화상자로 바꾼다
+            // (프론트는 같은 요청을 보고 에디터 대신 보관/해제 화면만 그린다)
+            if app.state::<PendingCrypto>().0.lock().unwrap().is_some() {
+                if let Some(win) = app.get_webview_window("main") {
+                    let _ = win.remove_menu();
+                    let _ = win.set_title("SSH Editor — 보관/해제");
+                    let _ = win.set_min_size(None::<tauri::LogicalSize<f64>>);
+                    let _ = win.set_size(tauri::LogicalSize::new(440.0, 380.0));
+                    let _ = win.set_resizable(false);
+                    let _ = win.set_maximizable(false);
+                    let _ = win.center();
+                    let _ = win.set_focus();
+                }
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -292,9 +321,26 @@ pub fn run(startup_args: Option<StartupArgs>) {
             // 기타
             take_open_files,
             local_read_file,
+            text_encoding::text_read_file,
+            text_encoding::text_write_file,
+            text_encoding::text_encoded_lengths,
             local_write_file,
             local_stat,
             local_list_dir,
+            local_crypto_plan,
+            local_crypto_batch,
+            take_crypto_request,
+            local_probe,
+            local_read_text,
+            local_read_bytes,
+            local_search,
+            sftp_read_bytes,
+            local_line_index,
+            local_read_lines,
+            local_read_segment,
+            local_write_segment,
+            explorer_menu_status,
+            explorer_menu_set,
             get_startup_args,
             read_clipboard_uploads,
             exit_vote,
